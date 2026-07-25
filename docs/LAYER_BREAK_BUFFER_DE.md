@@ -83,7 +83,7 @@ sagt Ihnen, wovor dieser Wert schützt:
 |---------------------|---------|-----------------|
 | 0 MB                | grau    | Nur Ausrichtung, kein Defektschutz. |
 | unter 35 MB         | rot     | Unter dem ~35 MB Defekt, der auf echter Hardware gemessen wurde. Video kann auf schlechten Sektoren landen. |
-| 35 bis 287 MB       | orange  | Deckt den typischen ~35 MB Defekt ab, aber größere Zonen sind häufig, und eine Disc mit Defektmanagement kann den wahren Schichtwechsel bis zu 128 MB hinter den berechneten Break verschieben. |
+| 35 bis 287 MB       | orange  | Deckt den typischen ~35 MB Defekt ab, aber größere Zonen sind häufig, und eine Disc mit Fehlerverwaltung kann den wahren Schichtwechsel bis zu 128 MB hinter den berechneten Break verschieben. |
 | 288 MB und mehr     | grün    | Empfohlen. Deckt alle häufig gemeldeten Defektzonen (35 bis 258 MB) und den verschobenen Schichtwechsel ab. Reicht bis 9999 für den seltenen Defekt über 1 GB. |
 
 Die Voreinstellung von 288 MB ist der grüne, empfohlene Wert. Lassen Sie ihn stehen, sofern

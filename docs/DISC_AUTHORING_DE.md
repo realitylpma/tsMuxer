@@ -103,6 +103,8 @@ irgendeinem beliebigen API-Wert. Beispiel von einem echten Verbatim BD-R DL:
 | ImgBurn „Disc Information, Free Sectors" | **24.438.784** | **12.219.392** | ja, der echte Break |
 | Windows IMAPI `TotalSectorsOnMedia` | 23.652.352 | 11.826.176 | nein für eine BD-R DL: 23.652.352 ist die Kapazität mit Fehlerverwaltung (BD-RE DL), 0,8 GB zu früh |
 
+![Die Layer-Break-lbn-Falle: die volle formatierte Disc-Kapazität verwenden](img/buffer_trap_de.png)
+
 Ein falscher (zu kleiner) Wert legt die Schutzzone etwa 0,8 GB vor den echten Layer-Wechsel.
 Dann liegen doch Videodaten auf den fehleranfälligen Sektoren, also genau das, was die
 Schutzzone verhindern soll. Verwende die volle formatierte Kapazität der Disc (ImgBurn

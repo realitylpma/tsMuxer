@@ -97,6 +97,8 @@ hands back. Example seen on a real Verbatim BD-R DL:
 | ImgBurn "Disc Information, Free Sectors" | **24,438,784** | **12,219,392** | yes, the real break |
 | Windows IMAPI `TotalSectorsOnMedia` | 23,652,352 | 11,826,176 | no for a BD-R DL: 23,652,352 is the defect-managed (BD-RE DL) capacity, 0.8 GB too early |
 
+![The layer-break-lbn trap: use the disc's full formatted capacity](img/buffer_trap_en.png)
+
 Feeding the wrong (smaller) number puts the guard zone about 0.8 GB before the real layer
 transition, so live video ends up on the defect-prone sectors, which is the exact thing the
 guard exists to prevent. Use the disc's full formatted capacity (ImgBurn "Free Sectors", or

@@ -75,6 +75,8 @@ BD-R XL 128 (4 レイヤー): 総数 / 4,  総数 * 2 / 4,  総数 * 3 / 4
 | ImgBurn の「Disc Information, Free Sectors」 | **24,438,784** | **12,219,392** | はい、本物のブレイク位置 |
 | Windows IMAPI の `TotalSectorsOnMedia` | 23,652,352 | 11,826,176 | BD-R DL では不可: 23,652,352 は欠陥管理ありの容量（BD-RE DL）で 0.8 GB 手前 |
 
+![--layer-break-lbn の落とし穴: ディスクのフル容量を使う](img/buffer_trap_ja.png)
+
 誤った（小さい）数値を与えると、ガード領域が実際のレイヤー遷移より約 0.8 GB 手前に配置され、映像本編が欠陥の起きやすいセクタに乗ってしまいます。これはガードが防ごうとしているまさにその事態です。ディスクのフォーマット済み総容量（ImgBurn の「Free Sectors」、または `READ FORMAT CAPACITIES` の formatted もしくは maximum ディスクリプタ）を使い、レイヤー数で割ってください。
 
 オーケストレーター側がこの数値をドライブから読み取り、`--layer-break-lbn` に渡す想定です。tsMuxeR 自体がライターに触れることは一切ありません。GUI には、ImgBurn の「Free Sectors」値をブレイクセクタへ変換する小さな計算機が用意されています。
