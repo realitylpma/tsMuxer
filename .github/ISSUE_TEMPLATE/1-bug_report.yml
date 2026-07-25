@@ -1,0 +1,109 @@
+name: Bug report
+description: Something does not work, produces a wrong result, or crashes.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The fields marked with a red asterisk are required.
+        The more precise you are, the faster it can be fixed.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the GUI title bar and in the first line of the command line output (for example 2.11.0).
+      placeholder: "2.11.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows 7 SP1
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: How were you using it
+      options:
+        - GUI (tsMuxerGUI)
+        - Command line (tsMuxeR)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - BDMV folder to ISO
+        - Muxing / authoring a disc
+        - Demuxing
+        - Playback of the result
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the problem. What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps, so the problem can be reproduced.
+      placeholder: |
+        1. Open the ... tab
+        2. Select ...
+        3. Click ...
+        4. See the error
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Program output / log
+      description: >
+        Paste the text tsMuxeR printed, especially the lines at the end of the run. For a
+        BDMV-to-ISO problem, include the report and the .layerbreak.txt sidecar if you have them.
+        This will be shown as code, no backticks needed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Source details (optional but very helpful)
+      description: >
+        The kind of source (BDMV folder, .m2ts, .mkv, ...), the disc type you targeted, and a
+        MediaInfo dump of the source if you can.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and did not find a duplicate.
+          required: true
+        - label: I am using the latest release.
+          required: true

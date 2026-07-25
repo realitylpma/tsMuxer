@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: BDMV folder to ISO guide
+    url: https://github.com/teaching-droid/tsMuxer/blob/master/docs/BDMV_TO_ISO.md
+    about: Step-by-step guide with screenshots. Please read it before reporting a problem with that feature.
+  - name: Usage and disc-authoring docs
+    url: https://github.com/teaching-droid/tsMuxer/blob/master/docs/USAGE.md
+    about: Command line options, meta file format, and the multi-layer authoring additions.

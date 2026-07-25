@@ -1,0 +1,50 @@
+name: Enhancement / feature request
+description: Suggest an improvement or a new capability.
+title: "[Enhancement]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Please describe what you want to achieve, not only the solution
+        you have in mind, so the best approach can be considered.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One line describing the enhancement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The problem or workflow this would help with. What is missing or awkward today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The change or feature you are proposing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have tried
+      description: Any workarounds or other tools you currently use for this.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and did not find a duplicate.
+          required: true

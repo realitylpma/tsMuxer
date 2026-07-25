@@ -1,0 +1,25 @@
+name: Question / other
+description: A question, or anything that is not a bug or a feature request.
+title: "[Other]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a usage question, please check the docs linked on the new-issue page first.
+
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      description: One line describing what this is about.
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Describe your question or point in full.
+    validations:
+      required: true
