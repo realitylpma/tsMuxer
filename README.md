@@ -35,6 +35,11 @@ Additions in this fork (see [DISC_AUTHORING.md](docs/DISC_AUTHORING.md) for deta
 * GUI: a "BDMV folder -> ISO" tab with a layer-break calculator (you copy the blank disc's "Free Sectors" value out of ImgBurn and paste it in; the break sectors are calculated for you), colour-coded guard hints, and input sanity warnings
 * GUI: fully translated interface (German, Spanish, French, Hebrew, Japanese, Russian, Chinese)
 
+**How does the layer-break guard work?** [The layer-break buffer](docs/LAYER_BREAK_BUFFER.md)
+explains, with diagrams, how the guard protects the movie and why a block of zeros in the
+middle of the disc image never damages the video (also available
+[auf Deutsch](docs/LAYER_BREAK_BUFFER_DE.md) and [日本語で](docs/LAYER_BREAK_BUFFER_JA.md)).
+
 ## Ethics
 
 This project operates under the W3C's
