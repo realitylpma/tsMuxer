@@ -15,7 +15,8 @@ BD-R XL discs. See [DISC_AUTHORING.md](DISC_AUTHORING.md) (also available in Ger
 
 A step-by-step guide to the "BDMV folder to ISO" tab, with screenshots of every stage, is in
 [BDMV_TO_ISO.md](BDMV_TO_ISO.md) (also available in German as
-[BDMV_TO_ISO_DE.md](BDMV_TO_ISO_DE.md)).
+[BDMV_TO_ISO_DE.md](BDMV_TO_ISO_DE.md) and in Japanese as
+[BDMV_TO_ISO_JA.md](BDMV_TO_ISO_JA.md)).
 
 ### Editing the Meta File in the GUI
 
