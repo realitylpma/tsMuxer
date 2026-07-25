@@ -61,6 +61,7 @@ build-x86_64/
 bld/
 climsvc/
 msvcbuild/
+guibuild/
 /build.ninja
 *.log
 .DS_Store
