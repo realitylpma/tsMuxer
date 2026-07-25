@@ -18,6 +18,12 @@ A step-by-step guide to the "BDMV folder to ISO" tab, with screenshots of every 
 [BDMV_TO_ISO_DE.md](BDMV_TO_ISO_DE.md) and in Japanese as
 [BDMV_TO_ISO_JA.md](BDMV_TO_ISO_JA.md)).
 
+For an illustrated explanation of how the layer-break guard protects the movie, and why a block
+of zeros in the middle of the image never damages the video, see
+[The layer-break buffer](LAYER_BREAK_BUFFER.md) (also available in German as
+[LAYER_BREAK_BUFFER_DE.md](LAYER_BREAK_BUFFER_DE.md) and in Japanese as
+[LAYER_BREAK_BUFFER_JA.md](LAYER_BREAK_BUFFER_JA.md)).
+
 ### Editing the Meta File in the GUI
 
 The tsMuxerGUI displays an auto-generated meta file in the "Meta file" section. This preview shows the exact content that will be used when you start muxing. 

@@ -3,6 +3,10 @@
 Dieser Fork ergänzt jaminmc/tsMuxer um Authoring-Funktionen für mehrschichtige Medien
 (BD-R/RE DL und BD-R XL). Alle sind optional; das Standardverhalten bleibt unverändert.
 
+> **Neu bei Layer-Breaks?** [Der Layer-Break-Puffer](LAYER_BREAK_BUFFER_DE.md) erklärt mit
+> Diagrammen, wie die Schutzzone den Film schützt und warum ein Block Nullen mitten im Image
+> das Video nie beschädigt.
+
 ## Neue Optionen (Mux-Modus)
 
 | Option | Zweck |

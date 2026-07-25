@@ -3,6 +3,10 @@
 This fork adds multi-layer (BD-R/RE DL and BD-R XL) authoring features on top of
 jaminmc/tsMuxer. All of them are opt-in; the default behaviour is unchanged.
 
+> **New to layer breaks?** [The layer-break buffer](LAYER_BREAK_BUFFER.md) explains, with
+> diagrams, how the guard band protects the movie and why a block of zeros in the middle of the
+> image never damages the video.
+
 ## New options (mux mode)
 
 | Option | Purpose |
