@@ -56,6 +56,24 @@ beschädigen. Das tut es nicht, und der Grund ist es wert, verstanden zu werden:
 Kurz gesagt: **Der Puffer ist ein Graben aus Nullen um die schlechtesten Sektoren der Disc,
 und die Filmdatei tritt über den Graben hinweg, statt durch ihn hindurch.**
 
+## Aber bleibt das Laufwerk nicht hängen, wenn es die Lücke überquert?
+
+Eine berechtigte Frage: Am Layer-Break muss der Laser trotzdem neu auf die andere Schicht
+fokussieren und den ganzen Block Nullen überqueren, physisch also eine gute Strecke. Warum
+gibt es dabei keine Verzögerung und keinen Aussetzer im Bild?
+
+Weil das Laufwerk den Decoder nie direkt vom Laser versorgt. Alles, was der Laser liest,
+landet zuerst in einem **Vorauslese-Puffer** (einem Speicher-Cache im Laufwerk und im Player),
+und das Bild, das Sie sehen, wird *aus diesem Puffer* wiedergegeben, nicht direkt von der Disc.
+Während der Decoder also in aller Ruhe die paar Sekunden Video abarbeitet, die schon im Puffer
+liegen, führt das Laufwerk im Hintergrund den physischen Schichtwechsel aus und tritt über die
+Nullen hinweg. Der Sprung dauert den Bruchteil einer Sekunde; der Puffer fasst weit mehr
+Spielzeit als das, sodass dem Decoder nie der Nachschub ausgeht und das Bild nicht einmal
+zuckt. Es ist derselbe Trick, mit dem ein tragbarer CD-Player einen Stoß übersteht, ohne dass
+die Musik springt.
+
+![Der Vorauslese-Puffer hält das Bild über den Layer-Break hinweg stabil](img/buffer_readahead_de.png)
+
 ## Wo der Break auf der Disc sitzt
 
 Eine zweischichtige Disc nutzt einen *entgegengesetzten Spurverlauf*: Schicht 0 wird von der

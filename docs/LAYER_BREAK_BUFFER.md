@@ -51,6 +51,23 @@ film. It does not, and the reason is worth understanding:
 In short: **the buffer is a moat of zeros around the disc's worst sectors, and the movie file
 steps over the moat instead of through it.**
 
+## But doesn't the drive stall while it crosses the gap?
+
+A fair question: at the layer break the laser still has to refocus onto the other layer and
+travel across the whole block of zeros, which is a long way physically. Why is there no pause
+or dropout in the picture while it does that?
+
+Because the drive never feeds the decoder straight from the laser. Everything the laser reads
+first lands in a **read-ahead buffer** (a memory cache inside the drive and the player), and
+the picture you watch is played *out of that buffer*, not directly off the disc. So while the
+decoder calmly drains the few seconds of video already sitting in the buffer, the drive
+performs the physical layer change and steps over the zeros in the background. The jump takes
+a fraction of a second; the buffer holds far more play time than that, so the decoder never
+runs dry and the picture never so much as flickers. It is the same trick that lets a portable
+CD player survive a knock without the music skipping.
+
+![The read-ahead buffer keeps the picture steady across the layer break](img/buffer_readahead_en.png)
+
 ## Where the break sits on the disc
 
 A dual-layer disc uses an *opposite track path*: layer 0 is recorded from the hub outward,
