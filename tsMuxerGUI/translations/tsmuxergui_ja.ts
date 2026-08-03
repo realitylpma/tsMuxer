@@ -3851,6 +3851,22 @@ Build the ISO anyway?</source>
         <translation>元のファイル順序を維持(シームレスブランチング)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>ディスクラベル（任意）:</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>ISO に書き込まれるボリュームラベル。空欄のままにすると既定のままになります。</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>フォルダー内のすべてのファイルを含める（BDMV だけでなく）</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>既定では BDMV、CERTIFICATE、AACS のディスクフォルダーだけが書き込まれ、それ以外（readme ファイル、ジャケット画像、追加フォルダーなど）はすべて省かれます。オンにすると、BDMV の隣にある他のすべてのファイルとフォルダーもディスクイメージに追加されます。</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>通常、ファイルはサイズの大きい順に書き込まれるため、本編がレイヤーブレイク上に配置され、ガード領域で保護されます。シームレスブランチングを使用するディスクでは、多数の個別セグメントを連続して再生します。元の順序を維持するとセグメントが再生順に近い並びで記録され、読み取りがよりスムーズになります。</translation>
     </message>

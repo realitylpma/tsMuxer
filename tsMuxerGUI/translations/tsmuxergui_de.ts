@@ -3851,6 +3851,22 @@ ISO trotzdem erstellen?</translation>
         <translation>Ursprüngliche Dateireihenfolge beibehalten (Seamless Branching)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>Datenträgerbezeichnung (optional):</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>Datenträgerbezeichnung (Volume Label), die in die ISO geschrieben wird. Leer lassen für die Vorgabe.</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>Alle Dateien aus dem Ordner einschließen (nicht nur BDMV)</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>Normalerweise werden nur die Disc-Ordner BDMV, CERTIFICATE und AACS geschrieben und alles andere (Readme-Dateien, Cover-Bilder, Zusatzordner) übersprungen. Mit Haken werden auch alle übrigen Dateien und Ordner neben BDMV in das Disc-Image aufgenommen.</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>Dateien werden normalerweise beginnend mit der größten geschrieben, sodass der Hauptfilm auf dem Layer-Break liegt und die Schutzzone erhält. Discs mit Seamless Branching spielen viele einzelne Segmente nacheinander ab; das Beibehalten der ursprünglichen Reihenfolge speichert sie nahe an ihrer Abspielreihenfolge, was für ein flüssigeres Auslesen sorgt.</translation>
     </message>

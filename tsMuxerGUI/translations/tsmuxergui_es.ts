@@ -3852,6 +3852,22 @@ Mantener la imagen en torno a 66 GB (las dos primeras capas) mejora las probabil
         <translation>Mantener el orden original de los archivos (seamless branching)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>Etiqueta del disco (opcional):</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>Etiqueta de volumen que se escribe en la ISO. Déjela vacía para mantener el valor predeterminado.</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>Incluir todos los archivos de la carpeta (no solo BDMV)</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>De forma predeterminada solo se escriben las carpetas de disco BDMV, CERTIFICATE y AACS y todo lo demás (archivos léeme, carátulas, carpetas adicionales) se omite. Marque esta casilla para añadir también a la ISO todos los demás archivos y carpetas que están junto a BDMV.</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>Normalmente los archivos se escriben empezando por el más grande, de modo que la película principal queda sobre el salto de capa y recibe la zona de protección. Los discos que usan seamless branching reproducen muchos segmentos separados en secuencia; mantener el orden original los almacena cerca de su orden de reproducción, lo que permite una lectura más fluida.</translation>
     </message>

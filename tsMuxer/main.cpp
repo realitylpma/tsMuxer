@@ -685,6 +685,8 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     bool originalOrder = false;
     bool layerFit = true;
     int64_t discCapacitySectors = 0;
+    bool keepExtras = false;
+    string discLabel;
     vector<string> positional;
     for (int i = 2; i < argc; ++i)
     {
@@ -706,6 +708,10 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
                 originalOrder = true;
             else if (a == "--no-layer-fit")
                 layerFit = false;
+            else if (a == "--keep-extra-files")
+                keepExtras = true;
+            else if (a.rfind("--label=", 0) == 0)
+                discLabel = a.substr(8);
             else
                 positional.push_back(a);
         }
@@ -720,7 +726,7 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         LTRACE(LT_ERROR, 2,
                "Usage: tsMuxeR --bdmv-to-iso [--layer-break-guard=<MB>] [--layer-break-guard-before=<MB>] "
                "[--layer-break-lbn=<sector>] [--disc-capacity=<sectors>] [--original-order] [--no-layer-fit] "
-               "<BDMV_folder> <out.iso>");
+               "[--keep-extra-files] [--label=<string>] <BDMV_folder> <out.iso>");
         return -1;
     }
     string srcRoot = positional[0];
@@ -786,7 +792,9 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         const string rel = toRel(f);
         string top = rel.substr(0, rel.find('/'));
         for (auto& c : top) c = static_cast<char>(toupper(c));
-        if (top != "BDMV" && top != "CERTIFICATE" && top != "AACS")
+        // --keep-extra-files opts out of the whitelist so companion files (readme, cover art, extra
+        // folders) are written to the disc image alongside the BD structure.
+        if (!keepExtras && top != "BDMV" && top != "CERTIFICATE" && top != "AACS")
         {
             if (!top.empty())
                 skippedTop.insert(rel.substr(0, rel.find('/')));
@@ -842,6 +850,10 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         return -1;
     }
     IsoWriter* iso = helper.isoWriter();
+    // Give the volume a label when one was requested. The direct ISO path already supports this;
+    // BDMV-to-ISO simply reuses the same BlurayHelper call. Empty label keeps the previous behaviour.
+    if (!discLabel.empty())
+        helper.setVolumeLabel(discLabel);
 
     // Emit "<pct>% complete" as the copy runs so the GUI progress bar advances. The copy is the slow
     // part (it may be reading an optical disc at only a few MB/s), so without this the bar sits at 0.0%

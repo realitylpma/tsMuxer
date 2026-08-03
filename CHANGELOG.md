@@ -1,3 +1,9 @@
+## tsMuxeR 2.12.0
+
+- GUI (BDMV to ISO): new "Disc label (optional)" field (CLI: --label=<name>). The volume label is written into the ISO, the same as the direct ISO output already allows; leaving it empty keeps the previous behaviour. Requested by DreckSoft.
+- GUI (BDMV to ISO): new "Include all files from the folder (not just BDMV)" checkbox (CLI: --keep-extra-files). By default only the disc-structure folders (BDMV, CERTIFICATE, AACS) are written; ticking this also adds every other file and folder next to BDMV (readme files, cover art, extra folders) to the image. Requested by DreckSoft.
+- Both new options are off by default, so an unchanged workflow produces the same ISO as before, and both are translated in all eight interface languages.
+
 ## tsMuxeR 2.11.0
 
 - GUI (BDMV to ISO): the layer-break guard now defaults to 288 MB. Reported real defect zones cluster around 35, 64 and 258 MB, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break; 288 covers all of these. The coloured hint under the field explains the choice at every value. Requested by Coopervid, based on his defect-size reports.

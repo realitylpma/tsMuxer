@@ -673,6 +673,14 @@ TsMuxerWindow::TsMuxerWindow()
             wrapTip(tr("Files are normally written largest first, so the main movie sits on the layer break and gets "
                        "the guard. Discs that use seamless branching play many separate segments in sequence; keeping "
                        "the original order stores them close to their playback order, which reads more smoothly.")));
+        auto* keepExtrasCheck = new QCheckBox(tr("Include all files from the folder (not just BDMV)"), bdmvTab);
+        keepExtrasCheck->setToolTip(
+            wrapTip(tr("By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else "
+                       "(readme files, cover art, extra folders) is skipped. Tick this to also add every other file "
+                       "and folder next to BDMV to the disc image.")));
+        auto* discLabelLabel = new QLabel(tr("Disc label (optional):"), bdmvTab);
+        auto* labelEdit = new QLineEdit(bdmvTab);
+        labelEdit->setToolTip(wrapTip(tr("Volume label written into the ISO. Leave empty to keep the default.")));
         auto* helpBtn = new QPushButton(tr("Where do I find this?"), bdmvTab);
         auto* breaksLabel = new QLabel(bdmvTab);
         breaksLabel->setWordWrap(true);
@@ -953,6 +961,9 @@ TsMuxerWindow::TsMuxerWindow()
         g->addWidget(divisLabel, r++, 0, 1, 3);
         g->addWidget(compatLabel, r++, 0, 1, 3);
         g->addWidget(fitLabel, r++, 0, 1, 3);
+        g->addWidget(discLabelLabel, r, 0);
+        g->addWidget(labelEdit, r++, 1, 1, 2);
+        g->addWidget(keepExtrasCheck, r++, 0, 1, 3);
         g->addWidget(orderCheck, r++, 0, 1, 3);
         g->addWidget(buildBtn, r++, 1);
         g->setRowStretch(r, 1);
@@ -1189,7 +1200,7 @@ TsMuxerWindow::TsMuxerWindow()
         connect(
             buildBtn, &QPushButton::clicked, this,
             [this, folderEdit, isoEdit, guardSpin, discTypeCombo, freeSectorsEdit, breaksList, buildBtn, beforeCheck,
-             guardBeforeSpin, orderCheck, readFreeSectors]
+             guardBeforeSpin, orderCheck, keepExtrasCheck, labelEdit, readFreeSectors]
             {
                 const QString folder = folderEdit->text().trimmed();
                 const QString iso = isoEdit->text().trimmed();
@@ -1249,6 +1260,10 @@ TsMuxerWindow::TsMuxerWindow()
                 // moved wholly past the break when it genuinely still fits on the disc.
                 if (const qint64 fsSectors = readFreeSectors(); fsSectors > 0)
                     args << ("--disc-capacity=" + QString::number(fsSectors));
+                if (keepExtrasCheck->isChecked())
+                    args << "--keep-extra-files";
+                if (const QString lbl = labelEdit->text().trimmed(); !lbl.isEmpty())
+                    args << ("--label=" + lbl);
                 args << folder << iso;
                 tsMuxerExecute(args);
             });

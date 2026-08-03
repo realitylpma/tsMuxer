@@ -3851,6 +3851,22 @@ Build the ISO anyway?</source>
         <translation>שמור על סדר הקבצים המקורי (seamless branching)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>תווית הדיסק (רשות):</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>תווית האמצעי הנכתבת ל-ISO. השאירו ריק כדי לשמור על ברירת המחדל.</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>כלול את כל הקבצים מהתיקייה (לא רק BDMV)</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>כברירת מחדל נכתבות רק תיקיות הדיסק BDMV, CERTIFICATE ו-AACS, וכל השאר (קובצי readme, תמונות עטיפה, תיקיות נוספות) מדולג. סמנו כדי להוסיף לתמונת הדיסק גם את כל שאר הקבצים והתיקיות שליד BDMV.</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>בדרך כלל הקבצים נכתבים מהגדול לקטן, ולכן הסרט הראשי יושב על נקודת מעבר השכבה (Layer Break) ומקבל את אזור ההגנה. תקליטורים המשתמשים ב-seamless branching מנגנים מקטעים נפרדים רבים ברצף; שמירה על הסדר המקורי מאחסנת אותם קרוב לסדר הניגון שלהם, וכך הקריאה חלקה יותר.</translation>
     </message>

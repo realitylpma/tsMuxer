@@ -3851,6 +3851,22 @@ Créer l'ISO malgré tout ?</translation>
         <translation>Conserver l’ordre d’origine des fichiers (seamless branching)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>Nom du disque (facultatif) :</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>Nom de volume écrit dans l'ISO. Laissez vide pour conserver la valeur par défaut.</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>Inclure tous les fichiers du dossier (pas seulement BDMV)</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>Par défaut, seuls les dossiers de disque BDMV, CERTIFICATE et AACS sont écrits et tout le reste (fichiers readme, jaquettes, dossiers supplémentaires) est ignoré. Cochez cette case pour ajouter aussi à l'ISO tous les autres fichiers et dossiers situés à côté de BDMV.</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>Les fichiers sont normalement écrits du plus grand au plus petit, de sorte que le film principal se trouve sur le changement de couche et bénéficie de la zone de protection. Les disques utilisant le seamless branching lisent de nombreux segments distincts à la suite ; conserver l’ordre d’origine les stocke près de leur ordre de lecture, ce qui rend la lecture plus fluide.</translation>
     </message>

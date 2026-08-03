@@ -3852,6 +3852,22 @@ Build the ISO anyway?</source>
         <translation>Сохранять исходный порядок файлов (seamless branching)</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>Метка диска (необязательно):</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>Метка тома, записываемая в ISO. Оставьте пустым, чтобы сохранить значение по умолчанию.</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>Включить все файлы из папки (не только BDMV)</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>По умолчанию записываются только папки диска BDMV, CERTIFICATE и AACS, а всё остальное (файлы readme, обложки, дополнительные папки) пропускается. Установите этот флажок, чтобы добавить в образ диска также и все прочие файлы и папки рядом с BDMV.</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>Обычно файлы записываются от больших к меньшим, поэтому основной фильм оказывается на переходе между слоями (layer break) и получает защитную зону. Диски с seamless branching воспроизводят множество отдельных сегментов подряд; сохранение исходного порядка размещает их ближе к порядку воспроизведения, что обеспечивает более плавное чтение.</translation>
     </message>

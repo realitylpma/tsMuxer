@@ -3851,6 +3851,22 @@ Build the ISO anyway?</source>
         <translation>保持原始文件顺序（无缝分支）</translation>
     </message>
     <message>
+        <source>Disc label (optional):</source>
+        <translation>光盘卷标（可选）：</translation>
+    </message>
+    <message>
+        <source>Volume label written into the ISO. Leave empty to keep the default.</source>
+        <translation>写入 ISO 的卷标。留空则保持默认。</translation>
+    </message>
+    <message>
+        <source>Include all files from the folder (not just BDMV)</source>
+        <translation>包含文件夹中的所有文件（不仅是 BDMV）</translation>
+    </message>
+    <message>
+        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
+        <translation>默认只写入 BDMV、CERTIFICATE 和 AACS 光盘文件夹，其他所有内容（自述文件、封面图片、附加文件夹）都会被跳过。勾选此项可将 BDMV 旁边的所有其他文件和文件夹也添加到光盘映像中。</translation>
+    </message>
+    <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>
         <translation>文件通常按从大到小的顺序写入，因此正片会位于换层点上并获得保护区。采用无缝分支的光盘会依次播放许多独立片段；保持原始顺序可让这些片段按接近播放顺序的方式存放，读取更加流畅。</translation>
     </message>
