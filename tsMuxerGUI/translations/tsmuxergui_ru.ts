@@ -3852,6 +3852,14 @@ Build the ISO anyway?</source>
         <translation>Сохранять исходный порядок файлов (seamless branching)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>Держать данные во внутренней области диска (заполнить внешний край)</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>Внешний край диска является самой подверженной ошибкам частью при записи. Если этот флажок установлен, фильм смещается к внутренним дорожкам каждого слоя, а внешняя область заполняется нулями, так что данные остаются вдали от слабого внешнего края. Образ дополняется до полного диска, поэтому запись охватывает весь диск. Защитная зона смены слоя рассчитывается автоматически; должны быть заданы Free Sectors диска.</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>Метка диска (необязательно):</translation>
     </message>

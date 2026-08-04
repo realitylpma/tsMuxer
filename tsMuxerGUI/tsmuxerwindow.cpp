@@ -678,6 +678,12 @@ TsMuxerWindow::TsMuxerWindow()
             wrapTip(tr("By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else "
                        "(readme files, cover art, extra folders) is skipped. Tick this to also add every other file "
                        "and folder next to BDMV to the disc image.")));
+        auto* innerOnlyCheck = new QCheckBox(tr("Keep data on the inner disc area (pad the outer edge)"), bdmvTab);
+        innerOnlyCheck->setToolTip(wrapTip(
+            tr("The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is "
+               "packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so "
+               "the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes "
+               "the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.")));
         auto* discLabelLabel = new QLabel(tr("Disc label (optional):"), bdmvTab);
         auto* labelEdit = new QLineEdit(bdmvTab);
         labelEdit->setToolTip(wrapTip(tr("Volume label written into the ISO. Leave empty to keep the default.")));
@@ -964,6 +970,7 @@ TsMuxerWindow::TsMuxerWindow()
         g->addWidget(discLabelLabel, r, 0);
         g->addWidget(labelEdit, r++, 1, 1, 2);
         g->addWidget(keepExtrasCheck, r++, 0, 1, 3);
+        g->addWidget(innerOnlyCheck, r++, 0, 1, 3);
         g->addWidget(orderCheck, r++, 0, 1, 3);
         g->addWidget(buildBtn, r++, 1);
         g->setRowStretch(r, 1);
@@ -1035,6 +1042,23 @@ TsMuxerWindow::TsMuxerWindow()
                     *beforeOverridden = false;  // closing it returns to the following default
                 updateFit();
             });
+        connect(innerOnlyCheck, &QCheckBox::toggled, bdmvTab,
+                [guardSpin, guardLabel, guardHintLabel, beforeCheck, guardBeforeLabel, guardBeforeSpin, guardBeforeHint,
+                 updateFit](bool on)
+                {
+                    // inner-only takes over the layer break: it sizes the guard automatically from the disc
+                    // type and the content, so the WHOLE manual guard mechanism (after-guard + the advanced
+                    // before-guard) is greyed out while it is active. Disc type / Free Sectors stay active
+                    // because inner-only reads them.
+                    guardSpin->setEnabled(!on);
+                    guardLabel->setEnabled(!on);
+                    guardHintLabel->setEnabled(!on);
+                    beforeCheck->setEnabled(!on);
+                    guardBeforeLabel->setEnabled(!on);
+                    guardBeforeSpin->setEnabled(!on);
+                    guardBeforeHint->setEnabled(!on);
+                    updateFit();
+                });
         connect(helpBtn, &QPushButton::clicked, this,
                 [this]
                 {
@@ -1200,7 +1224,7 @@ TsMuxerWindow::TsMuxerWindow()
         connect(
             buildBtn, &QPushButton::clicked, this,
             [this, folderEdit, isoEdit, guardSpin, discTypeCombo, freeSectorsEdit, breaksList, buildBtn, beforeCheck,
-             guardBeforeSpin, orderCheck, keepExtrasCheck, labelEdit, readFreeSectors]
+             guardBeforeSpin, orderCheck, keepExtrasCheck, innerOnlyCheck, labelEdit, readFreeSectors]
             {
                 const QString folder = folderEdit->text().trimmed();
                 const QString iso = isoEdit->text().trimmed();
@@ -1262,6 +1286,8 @@ TsMuxerWindow::TsMuxerWindow()
                     args << ("--disc-capacity=" + QString::number(fsSectors));
                 if (keepExtrasCheck->isChecked())
                     args << "--keep-extra-files";
+                if (innerOnlyCheck->isChecked())
+                    args << "--inner-only";
                 if (const QString lbl = labelEdit->text().trimmed(); !lbl.isEmpty())
                     args << ("--label=" + lbl);
                 args << folder << iso;

@@ -3851,6 +3851,14 @@ Build the ISO anyway?</source>
         <translation>שמור על סדר הקבצים המקורי (seamless branching)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>השאר את הנתונים באזור הפנימי של הדיסק (מלא את השוליים החיצוניים)</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>השוליים החיצוניים של דיסק הם החלק הרגיש ביותר לשגיאות בצריבה. כאשר האפשרות מסומנת, הסרט נדחס אל הרצועות הפנימיות של כל שכבה והאזור החיצוני מתמלא באפסים, כך שהנתונים נשארים הרחק מהשוליים החיצוניים החלשים. הקובץ מרופד עד לגודל הדיסק המלא, ולכן הצריבה כותבת את כל הדיסק. אזור המגן של מעבר השכבה מחושב אוטומטית; יש להגדיר את ה-Free Sectors של הדיסק.</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>תווית הדיסק (רשות):</translation>
     </message>

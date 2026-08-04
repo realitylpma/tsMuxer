@@ -293,6 +293,7 @@ class IsoWriter
 
     std::map<int, MappingEntry> m_mappingEntries;
     bool m_opened;
+    bool m_sparseOk = false;  // image file marked sparse -> guard/inner-only pads are holes, not real zeros
     // Dual-layer guard band (--layer-break-guard): m_layerBreakPoint is the ABSOLUTE image sector
     // where BD-R DL layer 1 begins (media-fixed at half the disc); m_layerBreakGuardSectors is the
     // amount of zero-filler placed on EACH side of it so no file data sits on the defect-prone

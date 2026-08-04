@@ -3851,6 +3851,14 @@ ISO trotzdem erstellen?</translation>
         <translation>Ursprüngliche Dateireihenfolge beibehalten (Seamless Branching)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>Daten im inneren Disc-Bereich halten (den äußeren Rand auffüllen)</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>Der äußere Rand einer Disc ist der fehleranfälligste Teil beim Brennen. Mit gesetztem Haken wird der Film zu den inneren Spuren jeder Schicht gepackt und der äußere Rand mit Nullen gefüllt, sodass die Daten vom schwachen Außenrand fernbleiben. Das Abbild wird auf die volle Disc aufgefüllt, der Brennvorgang beschreibt also die ganze Disc. Die Layer-Break-Schutzzone wird automatisch bemessen; die Free Sectors der Disc müssen gesetzt sein.</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>Datenträgerbezeichnung (optional):</translation>
     </message>

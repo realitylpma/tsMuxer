@@ -3851,6 +3851,14 @@ Créer l'ISO malgré tout ?</translation>
         <translation>Conserver l’ordre d’origine des fichiers (seamless branching)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>Garder les données sur la zone intérieure du disque (remplir le bord extérieur)</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>Le bord extérieur d'un disque est la partie la plus sujette aux erreurs à la gravure. Avec cette case cochée, le film est tassé vers les pistes intérieures de chaque couche et la zone extérieure est remplie de zéros, de sorte que les données restent loin du bord extérieur fragile. L'image est complétée jusqu'au disque entier, la gravure écrit donc tout le disque. La zone de garde du changement de couche est dimensionnée automatiquement ; les Free Sectors du disque doivent être renseignés.</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>Nom du disque (facultatif) :</translation>
     </message>

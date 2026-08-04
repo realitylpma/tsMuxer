@@ -1,3 +1,10 @@
+## tsMuxeR 2.13.0
+
+- GUI (BDMV to ISO): new **Keep data on the inner disc area (pad the outer edge)** checkbox (CLI: `--inner-only`). The outer edge of an optical disc is the most error-prone part to burn, so this packs the movie onto the inner tracks of every layer and fills the outer/rim region with zeros, keeping the data off the weak outer edge. The layer-break guard is sized automatically from the disc type and the content, and the image is padded to the full disc. When it is on, the manual guard controls are greyed out. Verified on dual-layer BD-R DL. Requested by DreckSoft.
+- Tested on marginal media: a BD-R DL that verified with a 41 MB uncorrectable defect right at the layer transition still played the movie flawlessly (checked across 1:29 to 1:31), because the defect fell entirely inside the guard's zero band, so no video data was lost.
+- BDMV to ISO: the image now gets the full standard Blu-ray folder structure by default (the empty AUXDATA, BDJO, JAR and META folders, a CERTIFICATE folder, and a BACKUP populated with copies of index.bdmv, MovieObject.bdmv and the PLAYLIST/CLIPINF files), the same structure tsMuxeR already creates when it authors a disc, so players that expect the complete layout are satisfied. Only what the source is missing is added: a folder that already ships its own BACKUP is left untouched, and the large .m2ts streams are never duplicated into it. Requested by Oleekae.
+- BDMV to ISO: images build faster and use far less scratch space. The layer-break and inner-only guard padding is now stored as a sparse region instead of writing gigabytes of literal zeros to disk, so a guarded image finishes much quicker while burning byte-for-byte identically (an 8 GB inner-only guard costs no disk space and no write time). The folder copy uses a larger buffer as well.
+
 ## tsMuxeR 2.12.0
 
 - GUI (BDMV to ISO): new "Disc label (optional)" field (CLI: --label=<name>). The volume label is written into the ISO, the same as the direct ISO output already allows; leaving it empty keeps the previous behaviour. Requested by DreckSoft.

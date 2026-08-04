@@ -686,6 +686,7 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     bool layerFit = true;
     int64_t discCapacitySectors = 0;
     bool keepExtras = false;
+    bool innerOnly = false;
     string discLabel;
     vector<string> positional;
     for (int i = 2; i < argc; ++i)
@@ -710,6 +711,8 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
                 layerFit = false;
             else if (a == "--keep-extra-files")
                 keepExtras = true;
+            else if (a == "--inner-only")
+                innerOnly = true;
             else if (a.rfind("--label=", 0) == 0)
                 discLabel = a.substr(8);
             else
@@ -726,7 +729,7 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         LTRACE(LT_ERROR, 2,
                "Usage: tsMuxeR --bdmv-to-iso [--layer-break-guard=<MB>] [--layer-break-guard-before=<MB>] "
                "[--layer-break-lbn=<sector>] [--disc-capacity=<sectors>] [--original-order] [--no-layer-fit] "
-               "[--keep-extra-files] [--label=<string>] <BDMV_folder> <out.iso>");
+               "[--keep-extra-files] [--inner-only] [--label=<string>] <BDMV_folder> <out.iso>");
         return -1;
     }
     string srcRoot = positional[0];
@@ -811,6 +814,60 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         LTRACE(LT_ERROR, 2, "No BDMV content found under " << srcRoot);
         return -1;
     }
+
+    // Match tsMuxeR's own BD authoring: give the ISO the full standard folder structure by default so
+    // players that expect it are satisfied. The empty standard folders (META/BDJO/JAR/AUXDATA + the
+    // CERTIFICATE/BACKUP sub-tree) are added after the copy via BlurayHelper::createBluRayDirs(); here we
+    // populate BACKUP with the small navigation files (never the large .m2ts, which BACKUP excludes) when
+    // the source disc did not ship its own BACKUP.
+    auto up = [](string s)
+    {
+        for (auto& c : s) c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+        return s;
+    };
+    auto has = [&](const char* prefix)
+    {
+        const string p = up(prefix);
+        for (const auto& it : items)
+            if (up(it.rel).rfind(p, 0) == 0)
+                return true;
+        return false;
+    };
+    const bool hasBdmv = has("BDMV/");
+    if (hasBdmv && !has("BDMV/BACKUP/"))
+    {
+        auto baseName = [](const string& r)
+        {
+            const auto p = r.find_last_of('/');
+            return p == string::npos ? r : r.substr(p + 1);
+        };
+        vector<Item> backup;
+        for (const auto& it : items)
+        {
+            const string R = up(it.rel);
+            string dst;
+            if (R == "BDMV/INDEX.BDMV")
+                dst = "BDMV/BACKUP/index.bdmv";
+            else if (R == "BDMV/MOVIEOBJECT.BDMV")
+                dst = "BDMV/BACKUP/MovieObject.bdmv";
+            else if (R.rfind("BDMV/PLAYLIST/", 0) == 0)
+                dst = "BDMV/BACKUP/PLAYLIST/" + baseName(it.rel);
+            else if (R.rfind("BDMV/CLIPINF/", 0) == 0)
+                dst = "BDMV/BACKUP/CLIPINF/" + baseName(it.rel);
+            else if (R.rfind("BDMV/BDJO/", 0) == 0)
+                dst = "BDMV/BACKUP/BDJO/" + baseName(it.rel);
+            if (!dst.empty())
+                backup.push_back({it.full, dst, it.size});
+        }
+        for (const auto& b : backup)
+        {
+            items.push_back(b);
+            total += b.size;
+        }
+        if (!backup.empty())
+            LTRACE(LT_INFO, 2, "  standard folders: generated BACKUP from " << backup.size() << " navigation file(s)");
+    }
+
     // Default: largest .m2ts first, so the main movie straddles the layer break and gets the guard
     // band. --original-order keeps the files in their disc order instead; better for seamless
     // branching titles whose many segments should stay physically close to their playback order.
@@ -818,6 +875,38 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         std::stable_sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.rel < b.rel; });
     else
         std::stable_sort(items.begin(), items.end(), [](const Item& a, const Item& b) { return a.size > b.size; });
+
+    // --inner-only: keep the payload on the inner tracks of every layer and pad each layer's outer edge
+    // (the rim) with zeros. BD-R DL fixes the layer break at the physical layer-0 capacity, so the drive
+    // cannot be made to jump early; instead we widen the layer-break guard symmetrically to (free space)/2
+    // per break, which pushes the movie toward both hubs and fills the outer/rim third with zeros. The
+    // worst-burned outer tracks then carry no data. Needs the disc capacity to know the free space.
+    if (innerOnly)
+    {
+        if (discCapacitySectors <= 0)
+        {
+            LTRACE(LT_ERROR, 2, "--inner-only needs the disc capacity; add --disc-capacity=<sectors>");
+            return -1;
+        }
+        if (layerBreakLbns.empty())
+            layerBreakLbns.push_back(static_cast<int>(discCapacitySectors / 2));  // dual-layer default break
+        const int64_t payloadSectors = (total + 2047) / 2048;
+        const int64_t marginSectors = 8192;  // ~16 MB for UDF overhead + a small inner free tail
+        const int nBreaks = static_cast<int>(layerBreakLbns.size());
+        const int64_t guardEach = (discCapacitySectors - payloadSectors - marginSectors) / (2 * nBreaks);
+        if (guardEach <= 0)
+            LTRACE(LT_WARN, 2,
+                   "--inner-only: the disc is (nearly) full, so there is no room to pad; keeping the normal guard");
+        else
+        {
+            const int guardMB = static_cast<int>(guardEach * 2048 / (1024 * 1024));
+            layerBreakGuardMB = guardMB;
+            layerBreakGuardBeforeMB = guardMB;
+            LTRACE(LT_INFO, 2,
+                   "  inner-only: data on the inner tracks; guard " << guardMB << " MB each side over " << nBreaks
+                                                                    << " break(s), outer/rim padded with zeros");
+        }
+    }
 
     // the metadata partition must hold ~1 File Entry per file + directory content; size it from the count
     const int extraISOBlocks = static_cast<int>(items.size()) / 32 + 16;
@@ -860,7 +949,7 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     // for the whole build and looks hung. Print only when the tenth-of-a-percent changes, so at most
     // ~1000 short lines are written regardless of the ISO size; std::endl flushes each so the GUI, which
     // reads stdout through a pipe, sees them live rather than after the buffer fills.
-    vector<uint8_t> buf(1024 * 1024);
+    vector<uint8_t> buf(16 * 1024 * 1024);  // 16 MB: fewer syscalls / higher throughput on fast NVMe
     int64_t written = 0;
     int lastTenths = -1;
     // Per-file data ranges in absolute image sectors, aligned with `items`; used afterwards to map
@@ -910,6 +999,12 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         in.close();
         ranges.push_back({startLbn, iso->currentImageLBA()});
     }
+    // Lay down the standard BD folder skeleton (empty META/BDJO/JAR/AUXDATA, CERTIFICATE, and the BACKUP
+    // sub-tree), exactly as tsMuxeR's own BD authoring does via the same call. createDir() is idempotent,
+    // so folders that already hold copied content are left untouched.
+    if (hasBdmv)
+        helper.createBluRayDirs();
+
     const auto pads = iso->layerBreakPads();  // copy: helper.close() finalizes the writer
     helper.close();
 

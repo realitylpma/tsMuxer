@@ -1,5 +1,6 @@
 #include <io.h>
 #include <windows.h>
+#include <winioctl.h>  // FSCTL_SET_SPARSE
 
 #include "../directory.h"
 #include "../file.h"
@@ -55,7 +56,7 @@ File::File(const char* fName, const unsigned int oflag,
     makeWin32OpenFlags(oflag, &dwDesiredAccess, &dwCreationDisposition, &dwShareMode);
     if (!systemDependentFlags)
     {
-        if ((oflag & ofRead) && !(oflag & ofWrite))
+        if (((oflag & ofRead) && !(oflag & ofWrite)) || (oflag & ofSequential))
             systemDependentFlags = FILE_FLAG_SEQUENTIAL_SCAN;
         else
             systemDependentFlags = FILE_FLAG_RANDOM_ACCESS;
@@ -97,7 +98,7 @@ bool File::open(const char* fName, const unsigned int oflag, unsigned int system
     makeWin32OpenFlags(oflag, &dwDesiredAccess, &dwCreationDisposition, &dwShareMode);
     if (!systemDependentFlags)
     {
-        if ((oflag & ofRead) && !(oflag & ofWrite))
+        if (((oflag & ofRead) && !(oflag & ofWrite)) || (oflag & ofSequential))
             systemDependentFlags = FILE_FLAG_SEQUENTIAL_SCAN;
         else
             systemDependentFlags = FILE_FLAG_RANDOM_ACCESS;
@@ -223,4 +224,12 @@ bool File::truncate(const uint64_t newFileSize) const
         throwFileError();
 
     return SetEndOfFile(m_impl) > 0;
+}
+
+bool File::setSparse() const
+{
+    if (!isOpen())
+        return false;
+    DWORD bytesReturned = 0;
+    return DeviceIoControl(m_impl, FSCTL_SET_SPARSE, nullptr, 0, nullptr, 0, &bytesReturned, nullptr) != 0;
 }

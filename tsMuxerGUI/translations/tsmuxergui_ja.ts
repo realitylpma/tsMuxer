@@ -3851,6 +3851,14 @@ Build the ISO anyway?</source>
         <translation>元のファイル順序を維持(シームレスブランチング)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>データをディスクの内周側に保つ（外周を埋める）</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>ディスクの外周は書き込み時に最もエラーが起きやすい部分です。これをオンにすると、映像は各層の内周トラック側に寄せられ、外周はゼロで埋められるので、データは弱い外周から離れた位置に保たれます。イメージはディスク全体まで埋められるため、書き込みはディスク全体に及びます。レイヤーブレイクのガードは自動的にサイズ調整されます。ディスクの Free Sectors の設定が必要です。</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>ディスクラベル（任意）:</translation>
     </message>

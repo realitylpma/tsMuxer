@@ -157,6 +157,10 @@ int64_t File::seek(const int64_t offset, const SeekMethod whence) const
 
 bool File::truncate(const uint64_t newFileSize) const { return ftruncate(to_fd(m_impl), newFileSize) == 0; }
 
+// POSIX files are sparse by default: extending with ftruncate() leaves a hole, and writing past a gap
+// keeps earlier gaps as holes. Nothing to enable, so just report that sparse behaviour is available.
+bool File::setSparse() const { return isOpen(); }
+
 void File::sync() { ::sync(); }
 
 #endif

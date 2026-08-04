@@ -15,6 +15,7 @@ class AbstractStream
     static constexpr unsigned int ofOpenExisting = 8;  // do not create file if absent
     static constexpr unsigned int ofCreateNew = 16;    // create new file. Return error If file exist
     static constexpr unsigned int ofNoTruncate = 32;   // keep file data while opening
+    static constexpr unsigned int ofSequential = 64;   // hint: sequential access (win32: FILE_FLAG_SEQUENTIAL_SCAN)
 
     virtual bool open(const char* fName, unsigned int oflag, unsigned int systemDependentFlags = 0) = 0;
     virtual bool close() = 0;
@@ -120,6 +121,16 @@ class File : public AbstractOutputStream
             \param newFileSize New size of the file. This function can both enlarge, as well as reduce the file size.
     */
     bool truncate(uint64_t newFileSize) const;
+
+    //! Mark the file as sparse so that large all-zero regions cost no disk space and no write time.
+    /*!
+            On NTFS this issues FSCTL_SET_SPARSE; afterwards, a region skipped by extending the file with
+            truncate()/seek() becomes a hole that reads back as zeros. On POSIX, sparse files are the
+            default, so this is a no-op that reports success. Fails on filesystems without sparse support
+            (FAT/exFAT, some network shares) - the caller should then fall back to writing real zeros.
+            \return true if the file is (now) sparse-capable, false otherwise.
+    */
+    bool setSparse() const;
 
     std::string getName() { return m_name; }
 

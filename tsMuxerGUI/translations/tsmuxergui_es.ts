@@ -3852,6 +3852,14 @@ Mantener la imagen en torno a 66 GB (las dos primeras capas) mejora las probabil
         <translation>Mantener el orden original de los archivos (seamless branching)</translation>
     </message>
     <message>
+        <source>Keep data on the inner disc area (pad the outer edge)</source>
+        <translation>Mantener los datos en la zona interior del disco (rellenar el borde exterior)</translation>
+    </message>
+    <message>
+        <source>The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.</source>
+        <translation>El borde exterior de un disco es la parte más propensa a errores al grabar. Con esta casilla marcada, la película se compacta hacia las pistas interiores de cada capa y la zona exterior se rellena con ceros, de modo que los datos quedan lejos del débil borde exterior. La imagen se rellena hasta el disco completo, así que la grabación escribe todo el disco. La zona de guarda del salto de capa se dimensiona automáticamente; hay que tener definidos los Free Sectors del disco.</translation>
+    </message>
+    <message>
         <source>Disc label (optional):</source>
         <translation>Etiqueta del disco (opcional):</translation>
     </message>

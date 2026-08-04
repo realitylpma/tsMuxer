@@ -666,9 +666,14 @@ void IsoWriter::setVolumeLabel(const std::string& value)
 
 bool IsoWriter::open(const std::string& fileName, const int64_t diskSize, const int extraISOBlocks)
 {
-    constexpr int systemFlags = 0;
-    if (!m_file.open(fileName.c_str(), File::ofWrite, systemFlags))
+    // Sequential hint: the image is written front-to-back with only a few descriptor seeks at finalize,
+    // so FILE_FLAG_SEQUENTIAL_SCAN suits it better than the default random-access flag.
+    if (!m_file.open(fileName.c_str(), File::ofWrite | File::ofSequential))
         return false;
+    // Mark the image sparse so the multi-GB layer-break / inner-only guard pads are stored as holes
+    // (they read back as zeros for burning) instead of being physically written. Falls back to real zero
+    // writes in writeZeroPad() when the target filesystem has no sparse support (FAT/exFAT, some shares).
+    m_sparseOk = m_file.setSparse();
 
     if (diskSize > 0)
     {
@@ -1487,8 +1492,28 @@ bool IsoWriter::nearLayerBreak(const int upcomingBytes) const
 // guarantees that.
 void IsoWriter::writeZeroPad(const int64_t sectors)
 {
-    static constexpr int PAD_CHUNK_SECTORS = 512;  // write the filler in 1 MB chunks
-    const std::vector<uint8_t> zeroBuff(PAD_CHUNK_SECTORS * SECTOR_SIZE, 0);
+    if (sectors <= 0)
+    {
+        m_lastWritedObjectID = -1;
+        return;
+    }
+    if (m_sparseOk)
+    {
+        // Extend the image across the guard as a sparse hole: no zero bytes hit the disk, yet the region
+        // reads back as zeros, so the burned image is byte-identical. truncate() sets the new file end;
+        // seek() then syncs the tracked position for the data that continues after the pad.
+        const int64_t newPos = static_cast<int64_t>(m_file.pos()) + sectors * SECTOR_SIZE;
+        // Extend only, never shrink: writeZeroPad is always called at the append point, but guard anyway
+        // so a stray truncate() can never destroy already-written data.
+        if (newPos > m_file.size())
+            m_file.truncate(static_cast<uint64_t>(newPos));
+        m_file.seek(newPos);
+        m_lastWritedObjectID = -1;
+        return;
+    }
+    // Fallback (no sparse support): physically write the zeros in large chunks.
+    static constexpr int PAD_CHUNK_SECTORS = 8192;  // 16 MB chunks
+    const std::vector<uint8_t> zeroBuff(static_cast<size_t>(PAD_CHUNK_SECTORS) * SECTOR_SIZE, 0);
     int64_t restSectors = sectors;
     while (restSectors > 0)
     {
