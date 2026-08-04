@@ -1,3 +1,7 @@
+## tsMuxeR 2.13.1
+
+- BDMV to ISO: corrected the "Include all files from the folder" checkbox tooltip. It now states that the full standard Blu-ray folder structure (the empty AUXDATA, BDJO, JAR and META folders, a CERTIFICATE folder, and a populated BACKUP) is completed automatically by default, matching a real BD/UHD disc. No behaviour change; the 2.13.0 build already created these folders.
+
 ## tsMuxeR 2.13.0
 
 - GUI (BDMV to ISO): new **Keep data on the inner disc area (pad the outer edge)** checkbox (CLI: `--inner-only`). The outer edge of an optical disc is the most error-prone part to burn, so this packs the movie onto the inner tracks of every layer and fills the outer/rim region with zeros, keeping the data off the weak outer edge. The layer-break guard is sized automatically from the disc type and the content, and the image is padded to the full disc. When it is on, the manual guard controls are greyed out. Verified on dual-layer BD-R DL. Requested by DreckSoft.

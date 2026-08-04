@@ -675,9 +675,11 @@ TsMuxerWindow::TsMuxerWindow()
                        "the original order stores them close to their playback order, which reads more smoothly.")));
         auto* keepExtrasCheck = new QCheckBox(tr("Include all files from the folder (not just BDMV)"), bdmvTab);
         keepExtrasCheck->setToolTip(
-            wrapTip(tr("By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else "
-                       "(readme files, cover art, extra folders) is skipped. Tick this to also add every other file "
-                       "and folder next to BDMV to the disc image.")));
+            wrapTip(tr("By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard "
+                       "Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META "
+                       "folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; "
+                       "anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to "
+                       "add those extras to the image too.")));
         auto* innerOnlyCheck = new QCheckBox(tr("Keep data on the inner disc area (pad the outer edge)"), bdmvTab);
         innerOnlyCheck->setToolTip(wrapTip(
             tr("The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is "
