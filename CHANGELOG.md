@@ -1,3 +1,7 @@
+## tsMuxeR 2.13.3
+
+- Fixed the interface language not fully switching on the BDMV to ISO tab. Changing the interface language at runtime did not re-translate the "Include all files from the folder", "Keep data on the inner disc area", and disc label controls, so they kept the previously shown language while the rest of the tab updated. They now switch with everything else. This became visible only once 2.13.2 fixed the embedded translations.
+
 ## tsMuxeR 2.13.2
 
 - Fixed the interface translations. A build-pipeline issue had been embedding a stale compiled-translation file, so several BDMV to ISO options added since 2.11.0 - the disc label field, "Include all files from the folder", and "Keep data on the inner disc area" - appeared in English in every language. The build now always embeds the current translations, so all eight interface languages show correctly again.

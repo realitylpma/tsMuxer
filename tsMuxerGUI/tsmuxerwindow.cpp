@@ -1097,9 +1097,9 @@ TsMuxerWindow::TsMuxerWindow()
         // ui->retranslateUi(); these hand-built widgets are not, so register a hook the changeEvent will call.
         m_retranslateHooks.push_back(
             [this, bdmvTab, info, folderLabel, outputLabel, guardLabel, discTypeLabel, freeSectorsLabel, folderBtn,
-             isoBtn, helpBtn, buildBtn, discTypeCombo, freeSectorsEdit, manualCheck, orderCheck, guardSpin, refresh,
-             updateGuard, beforeCheck, guardBeforeLabel, guardBeforeSpin, guardBeforeHint, fitLabel, updateFit,
-             updateFolderStatus]()
+             isoBtn, helpBtn, buildBtn, discTypeCombo, freeSectorsEdit, manualCheck, orderCheck, keepExtrasCheck,
+             innerOnlyCheck, discLabelLabel, labelEdit, guardSpin, refresh, updateGuard, beforeCheck, guardBeforeLabel,
+             guardBeforeSpin, guardBeforeHint, fitLabel, updateFit, updateFolderStatus]()
             {
                 ui->tabWidget->setTabText(ui->tabWidget->indexOf(bdmvTab), tr("BDMV folder -> ISO"));
                 info->setText(
@@ -1135,6 +1135,22 @@ TsMuxerWindow::TsMuxerWindow()
                        "gets the guard. Discs that use seamless branching play many separate segments in "
                        "sequence; keeping the original order stores them close to their playback order, which "
                        "reads more smoothly.")));
+                keepExtrasCheck->setText(tr("Include all files from the folder (not just BDMV)"));
+                keepExtrasCheck->setToolTip(wrapTip(
+                    tr("By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard "
+                       "Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META "
+                       "folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; "
+                       "anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to "
+                       "add those extras to the image too.")));
+                innerOnlyCheck->setText(tr("Keep data on the inner disc area (pad the outer edge)"));
+                innerOnlyCheck->setToolTip(wrapTip(tr(
+                    "The outer edge of a disc is the most error-prone part to burn. With this ticked, the movie is "
+                    "packed toward the inner tracks of every layer and the outer/rim region is filled with zeros, so "
+                    "the data stays off the weak outer edge. The image is padded to the full disc, so the burn writes "
+                    "the whole disc. The layer-break guard is sized automatically; needs the disc Free Sectors set.")));
+                discLabelLabel->setText(tr("Disc label (optional):"));
+                labelEdit->setToolTip(
+                    wrapTip(tr("Volume label written into the ISO. Leave empty to keep the default.")));
                 manualCheck->setText(tr("Enter Free Sectors manually (advanced)"));
                 manualCheck->setToolTip(
                     wrapTip(tr("The Free Sectors above are pre-filled for the selected disc and locked to "
