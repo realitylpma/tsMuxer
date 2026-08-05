@@ -1,6 +1,6 @@
 # BDMV folder to burnable ISO
 
-This guide shows how to turn a BDMV disc folder into a BD-ROM ISO that is safe to burn onto multi-layer media. It was written with tsMuxeR GUI 2.11.0; the screenshots show exactly what you see on screen.
+This guide shows how to turn a BDMV disc folder into a BD-ROM ISO that is safe to burn onto multi-layer media. It was written with tsMuxeR GUI 2.11.0 and updated through 2.13; the screenshots show exactly what you see on screen.
 
 ## What this tab does
 
@@ -86,6 +86,19 @@ Below about 35 MB it turns red: video may land on sectors that are known to fail
 
 When in doubt, leave it at 288 MB. For the rare defects beyond 1 GB the field goes up to 9999.
 
+## Keeping the movie off the outer edge (inner-only)
+
+The outer rim of an optical disc is the hardest part to burn well: it is written last and fastest, and it is where read errors show up first. The `Keep data on the inner disc area (pad the outer edge)` checkbox packs the whole movie onto the inner tracks of every layer and fills the outer region with zeros, so nothing important lands on that weak outer edge.
+
+![Inner-only, with the manual guard greyed out](img/en/12_inner_only.png)
+
+When you tick it:
+
+* tsMuxeR sizes the guard automatically from the disc type and the amount of content and pads the image out to the full disc, so the manual `Layer-break guard` field and the advanced `Also fill before the break` option grey out (both ringed above). There is nothing to set by hand.
+* The movie still plays seamlessly across the layer break, exactly like the fixed guard; the zero fill simply moves to the outer edge instead of sitting in a band right after the break.
+
+Use it when your priority is the most robust possible burn and you do not mind the image filling the whole disc. Leave it off if you would rather keep the image small and place a fixed guard yourself. It was verified on dual-layer BD-R DL: a disc that verified with a 41 MB uncorrectable defect right at the layer transition still played the movie flawlessly, because the defect fell inside the zero band. Requested by DreckSoft.
+
 ## Advanced options
 
 `Also fill before the break` adds a second, smaller guard in front of the break (default 4 MB). The standard guard is asymmetric on purpose, because most defects sit at the start of the next layer; turn this on only for media that also fail just before the break.
@@ -93,6 +106,15 @@ When in doubt, leave it at 288 MB. For the rare defects beyond 1 GB the field go
 `Keep original file order (seamless branching)` prevents the files from being rearranged. Normally the largest file is placed first, which gives the guard the best position; if your disc relies on seamless branching, where the stream files must stay in their original order, tick this instead.
 
 ![Advanced options](img/en/08_advanced.png)
+
+## Disc label and included files
+
+Two more options sit at the bottom of the tab:
+
+* `Disc label (optional)`: the volume label written into the ISO. Leave it empty to keep the previous behaviour.
+* `Include all files from the folder (not just BDMV)`: by default the image holds the disc-structure folders (`BDMV`, `CERTIFICATE`, `AACS`). Tick this to also add every other file and folder next to `BDMV`, such as readme files or cover art.
+
+Either way, tsMuxeR completes the full standard Blu-ray folder layout for you: the empty `AUXDATA`, `BDJO`, `JAR` and `META` folders, a `CERTIFICATE` folder, and a `BACKUP` filled with copies of `index.bdmv`, `MovieObject.bdmv` and the `PLAYLIST`/`CLIPINF` files, the same structure tsMuxeR creates when it authors a disc. Only what the source is missing is added, and the large `.m2ts` streams are never duplicated, so players that expect the complete layout are satisfied without bloating the image.
 
 ## A disc or mounted ISO as source
 
@@ -123,6 +145,14 @@ The playback time is the useful part: that is the moment the player crosses to t
 ## The layerbreak text file
 
 Next to the ISO a small text file is created, named after it, for example `MOVIE.iso.layerbreak.txt`. It contains the same layer-break report, so you can look up the break position and the playback time later without rebuilding anything. If you keep the ISO for future burns, keep the text file with it.
+
+## How much disk space the ISO uses
+
+The layer-break guard and the inner-only padding are stored as a sparse region: the zeros are recorded as an empty hole in the file instead of gigabytes of literal zero bytes on disk. So the `.iso` on your hard drive can be much smaller than the disc it represents; an inner-only image padded to a full 50 GB BD-R DL may take only about the size of the movie itself, because the whole outer-edge fill costs no disk space.
+
+This changes nothing about the burn. When you write the ISO, the drive still lays down the complete disc, zeros and all, byte for byte identical to a non-sparse image, so the burn takes the full time for the disc size. The sparse file only saves room on your hard drive and lets the build finish sooner; it does not make the disc smaller or quicker to burn.
+
+If you copy the ISO to a drive or filesystem that does not support sparse files, it expands to its full size there. That is normal, and the disc it produces is the same either way.
 
 ## Burning
 

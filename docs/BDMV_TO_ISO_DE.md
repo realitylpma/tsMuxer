@@ -1,6 +1,6 @@
 # BDMV-Ordner in eine brennbare ISO verwandeln
 
-Diese Anleitung zeigt Schritt für Schritt, wie aus einem BDMV-Disc-Ordner eine BD-ROM-ISO wird, die sich gefahrlos auf mehrschichtige Medien brennen lässt. Sie entstand mit tsMuxeR GUI 2.11.0; die Bildschirmfotos zeigen genau das, was auch bei Ihnen zu sehen ist.
+Diese Anleitung zeigt Schritt für Schritt, wie aus einem BDMV-Disc-Ordner eine BD-ROM-ISO wird, die sich gefahrlos auf mehrschichtige Medien brennen lässt. Sie entstand mit tsMuxeR GUI 2.11.0 und wurde bis 2.13 aktualisiert; die Bildschirmfotos zeigen genau das, was auch bei Ihnen zu sehen ist.
 
 ## Was dieser Reiter macht
 
@@ -86,6 +86,19 @@ Unterhalb von etwa 35 MB wird er rot: Das Video kann dann auf Sektoren landen, d
 
 Im Zweifel lassen Sie die 288 MB stehen. Für die seltenen Defekte jenseits von 1 GB reicht das Feld bis 9999.
 
+## Den Film vom äußeren Rand fernhalten (nur innen)
+
+Der äußere Rand einer optischen Disc ist der Teil, der sich am schwersten sauber brennen lässt: Er wird zuletzt und am schnellsten beschrieben, und dort treten Lesefehler zuerst auf. Das Kontrollkästchen `Daten im inneren Disc-Bereich halten (den äußeren Rand auffüllen)` packt den ganzen Film auf die inneren Spuren jeder Schicht und füllt den äußeren Bereich mit Nullen, sodass nichts Wichtiges auf diesem schwachen äußeren Rand landet.
+
+![Nur innen, mit ausgegrautem manuellem Schutz](img/de/12_inner_only.png)
+
+Wenn Sie es anhaken:
+
+* tsMuxeR bemisst den Schutz automatisch nach Disc-Typ und Inhaltsmenge und füllt das Image auf die volle Disc auf. Deshalb werden das Feld `Layer-Break-Schutz` und die erweiterte Option `Auch vor dem Break auffüllen` ausgegraut (beide oben rot umrandet). Es ist nichts von Hand einzustellen.
+* Der Film läuft weiterhin nahtlos über den Layer-Break, genau wie beim festen Schutz; die Nullfüllung wandert nur an den äußeren Rand, statt in einem Band direkt hinter dem Break zu liegen.
+
+Nutzen Sie es, wenn Ihnen der robusteste mögliche Brennvorgang am wichtigsten ist und es Ihnen nichts ausmacht, dass das Image die ganze Disc füllt. Lassen Sie es aus, wenn Sie das Image lieber klein halten und den Schutz selbst festlegen möchten. Geprüft auf zweischichtiger BD-R DL: Eine Disc, die mit einem 41 MB großen, nicht korrigierbaren Defekt genau am Schichtübergang verifizierte, spielte den Film dennoch fehlerfrei ab, weil der Defekt in das Nullband fiel. Angeregt von DreckSoft.
+
 ## Erweiterte Einstellungen
 
 `Auch vor dem Break auffüllen` legt eine zweite, kleinere Schutzzone vor den Break (voreingestellt 4 MB). Die normale Schutzzone ist bewusst asymmetrisch, weil die meisten Defekte am Anfang der nächsten Schicht liegen; schalten Sie das nur für Medien ein, die auch kurz vor dem Break versagen.
@@ -93,6 +106,15 @@ Im Zweifel lassen Sie die 288 MB stehen. Für die seltenen Defekte jenseits von 
 `Ursprüngliche Dateireihenfolge beibehalten (Seamless Branching)` verhindert, dass die Dateien umsortiert werden. Normalerweise wird die größte Datei zuerst abgelegt, was der Schutzzone die beste Position verschafft. Setzt Ihre Disc dagegen auf Seamless Branching, wo die Stream-Dateien in ihrer ursprünglichen Reihenfolge bleiben müssen, setzen Sie hier den Haken.
 
 ![Erweiterte Einstellungen](img/de/08_advanced.png)
+
+## Datenträgerbezeichnung und einbezogene Dateien
+
+Unten im Reiter sitzen zwei weitere Optionen:
+
+* `Datenträgerbezeichnung (optional)`: die Volume-Bezeichnung, die in die ISO geschrieben wird. Leer lassen behält das bisherige Verhalten bei.
+* `Alle Dateien aus dem Ordner einschließen (nicht nur BDMV)`: Standardmäßig enthält das Image die Disc-Struktur-Ordner (`BDMV`, `CERTIFICATE`, `AACS`). Mit diesem Haken kommen auch alle übrigen Dateien und Ordner neben `BDMV` hinzu, etwa Readme-Dateien oder Cover-Bilder.
+
+So oder so vervollständigt tsMuxeR für Sie die komplette Standard-Blu-ray-Ordnerstruktur: die leeren Ordner `AUXDATA`, `BDJO`, `JAR` und `META`, einen `CERTIFICATE`-Ordner und ein `BACKUP` mit Kopien von `index.bdmv`, `MovieObject.bdmv` sowie den Dateien aus `PLAYLIST`/`CLIPINF`, dieselbe Struktur, die tsMuxeR auch beim Erstellen einer Disc anlegt. Nur was der Quelle fehlt, wird ergänzt, und die großen `.m2ts`-Streams werden nie doppelt abgelegt. So sind Player, die das vollständige Layout erwarten, zufrieden, ohne dass das Image aufgebläht wird.
 
 ## Eine Disc oder eingebundene ISO als Quelle
 
@@ -123,6 +145,14 @@ Die Abspielzeit ist der nützliche Teil: Genau dort wechselt der Player auf die 
 ## Die layerbreak-Textdatei
 
 Neben der ISO wird eine kleine Textdatei angelegt, benannt nach der ISO, zum Beispiel `MOVIE.iso.layerbreak.txt`. Sie enthält denselben Layer-Break-Bericht, sodass Sie Break-Position und Abspielzeit später nachschlagen können, ohne etwas neu zu erstellen. Wenn Sie die ISO für spätere Brennvorgänge aufheben, heben Sie die Textdatei mit auf.
+
+## Wie viel Speicherplatz die ISO belegt
+
+Der Layer-Break-Schutz und die Nur-innen-Füllung werden als sparse-Bereich gespeichert: Die Nullen werden als leeres Loch in der Datei vermerkt, statt als gigabyteweise echte Null-Bytes auf der Platte. Die `.iso` auf Ihrer Festplatte kann daher viel kleiner sein als die Disc, die sie darstellt; ein Nur-innen-Image, das auf eine volle 50-GB-BD-R-DL aufgefüllt ist, belegt unter Umständen nur etwa die Größe des Films selbst, weil die gesamte Randfüllung keinen Speicherplatz kostet.
+
+Am Brennen ändert das nichts. Beim Schreiben der ISO legt das Laufwerk weiterhin die komplette Disc an, Nullen und alles, Byte für Byte identisch mit einem nicht-sparse Image; der Brennvorgang dauert also die volle Zeit für die Disc-Größe. Die sparse-Datei spart nur Platz auf Ihrer Festplatte und lässt die Erstellung früher fertig werden; sie macht die Disc weder kleiner noch schneller zu brennen.
+
+Wenn Sie die ISO auf ein Laufwerk oder Dateisystem kopieren, das keine sparse-Dateien unterstützt, wächst sie dort auf ihre volle Größe an. Das ist normal, und die Disc, die daraus entsteht, ist in beiden Fällen dieselbe.
 
 ## Das Brennen
 
