@@ -3867,8 +3867,8 @@ Build the ISO anyway?</source>
         <translation>Include all files from the folder (not just BDMV)</translation>
     </message>
     <message>
-        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
-        <translation>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</translation>
+        <source>By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to add those extras to the image too.</source>
+        <translation>By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to add those extras to the image too.</translation>
     </message>
     <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>

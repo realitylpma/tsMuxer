@@ -3871,8 +3871,8 @@ Build the ISO anyway?</source>
         <translation>包含文件夹中的所有文件（不仅是 BDMV）</translation>
     </message>
     <message>
-        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
-        <translation>默认只写入 BDMV、CERTIFICATE 和 AACS 光盘文件夹，其他所有内容（自述文件、封面图片、附加文件夹）都会被跳过。勾选此项可将 BDMV 旁边的所有其他文件和文件夹也添加到光盘映像中。</translation>
+        <source>By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to add those extras to the image too.</source>
+        <translation>默认会写入 BDMV、CERTIFICATE 和 AACS 光盘文件夹，并自动补全完整的标准蓝光文件夹结构（空的 AUXDATA、BDJO、JAR 和 META 文件夹、CERTIFICATE 以及已填充的 BACKUP），使镜像与真实的 BD/UHD 光盘一致；BDMV 旁边的其他内容（自述文件、封面图、额外文件夹）将被跳过。勾选此项可将这些额外文件也加入镜像。</translation>
     </message>
     <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>

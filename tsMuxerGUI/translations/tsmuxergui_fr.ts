@@ -3871,8 +3871,8 @@ Créer l'ISO malgré tout ?</translation>
         <translation>Inclure tous les fichiers du dossier (pas seulement BDMV)</translation>
     </message>
     <message>
-        <source>By default only the BDMV, CERTIFICATE and AACS disc folders are written and everything else (readme files, cover art, extra folders) is skipped. Tick this to also add every other file and folder next to BDMV to the disc image.</source>
-        <translation>Par défaut, seuls les dossiers de disque BDMV, CERTIFICATE et AACS sont écrits et tout le reste (fichiers readme, jaquettes, dossiers supplémentaires) est ignoré. Cochez cette case pour ajouter aussi à l'ISO tous les autres fichiers et dossiers situés à côté de BDMV.</translation>
+        <source>By default the BDMV, CERTIFICATE and AACS disc folders are written, and the full standard Blu-ray folder structure is completed automatically (the empty AUXDATA, BDJO, JAR and META folders, CERTIFICATE, and a populated BACKUP) so the image matches a real BD/UHD disc; anything else next to BDMV (readme files, cover art, extra folders) is skipped. Tick this to add those extras to the image too.</source>
+        <translation>Par défaut, les dossiers de disque BDMV, CERTIFICATE et AACS sont écrits, et la structure de dossiers Blu-ray standard complète est ajoutée automatiquement (les dossiers vides AUXDATA, BDJO, JAR et META, CERTIFICATE et un BACKUP rempli), afin que l'image corresponde à un vrai disque BD/UHD ; tout le reste à côté de BDMV (fichiers readme, jaquettes, dossiers supplémentaires) est ignoré. Cochez cette case pour ajouter aussi ces éléments à l'image.</translation>
     </message>
     <message>
         <source>Files are normally written largest first, so the main movie sits on the layer break and gets the guard. Discs that use seamless branching play many separate segments in sequence; keeping the original order stores them close to their playback order, which reads more smoothly.</source>

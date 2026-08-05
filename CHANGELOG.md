@@ -1,3 +1,8 @@
+## tsMuxeR 2.13.2
+
+- Fixed the interface translations. A build-pipeline issue had been embedding a stale compiled-translation file, so several BDMV to ISO options added since 2.11.0 - the disc label field, "Include all files from the folder", and "Keep data on the inner disc area" - appeared in English in every language. The build now always embeds the current translations, so all eight interface languages show correctly again.
+- The "Include all files from the folder" tooltip now also explains that the full standard Blu-ray folder structure is completed automatically, translated in all eight languages.
+
 ## tsMuxeR 2.13.1
 
 - BDMV to ISO: corrected the "Include all files from the folder" checkbox tooltip. It now states that the full standard Blu-ray folder structure (the empty AUXDATA, BDJO, JAR and META folders, a CERTIFICATE folder, and a populated BACKUP) is completed automatically by default, matching a real BD/UHD disc. No behaviour change; the 2.13.0 build already created these folders.

@@ -61,6 +61,12 @@ configure_file(${lang_qrc} ${lang_qrc} COPYONLY)
 
 qt6_add_translation(QM_FILES ${tsmuxer_ts_files})
 
+# Make the embedded-resource (rcc) step depend on the compiled .qm, so a build always embeds the
+# CURRENT translations. Without this, autorcc can embed a stale .qm and strings added since the last
+# .qm build ship untranslated (this caused strings added from 2.12.0 onward to appear in English).
+set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/${lang_qrc}
+                            PROPERTIES OBJECT_DEPENDS "${QM_FILES}")
+
 set(tsmuxer_gui_sources
   main.cpp
   tsmuxerwindow.cpp
