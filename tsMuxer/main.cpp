@@ -209,13 +209,15 @@ void detectStreamReader(const char* fileName, MPLSParser* mplsParser, bool isSub
                 break;
             }
             if (known)
-                LTRACE(LT_INFO, 2, "Not supported: " << known << " (stream type 0x" << std::hex
-                                                     << streams[i].containerStreamType << std::dec
-                                                     << "). Muxing this stream type is not implemented, "
-                                                        "so the track is skipped.");
+                LTRACE(LT_INFO, 2,
+                       "Not supported: " << known << " (stream type 0x" << std::hex << streams[i].containerStreamType
+                                         << std::dec
+                                         << "). Muxing this stream type is not implemented, "
+                                            "so the track is skipped.");
             else if (streams[i].containerStreamType)
-                LTRACE(LT_INFO, 2, "Can't detect stream type (the container declares stream type 0x"
-                                       << std::hex << streams[i].containerStreamType << std::dec << ")");
+                LTRACE(LT_INFO, 2,
+                       "Can't detect stream type (the container declares stream type 0x"
+                           << std::hex << streams[i].containerStreamType << std::dec << ")");
             else
                 LTRACE(LT_INFO, 2, "Can't detect stream type");
         }

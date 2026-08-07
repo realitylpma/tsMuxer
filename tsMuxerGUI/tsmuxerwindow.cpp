@@ -1353,23 +1353,23 @@ TsMuxerWindow::TsMuxerWindow()
         auto* fitLabel = new QLabel(tr("Fit to disc:"), dlBox);
         // The BDMV -> ISO tab explains every one of its controls; this group had nothing at all, so the
         // same three questions came up here. Text only, no behaviour change.
-        const QString fitTip = wrapTip(tr(
-            "Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc "
-            "you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it "
-            "does not fit."));
+        const QString fitTip =
+            wrapTip(tr("Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc "
+                       "you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it "
+                       "does not fit."));
         fitLabel->setToolTip(fitTip);
         discSizeCombo->setToolTip(fitTip);
-        guardCheck->setToolTip(wrapTip(tr(
-            "On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones "
-            "most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits "
-            "there and playback runs smoothly across the break. Applies to ISO output.")));
-        guardSpin->setToolTip(wrapTip(tr(
-            "How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are "
-            "safer but take that space away from the movie.")));
-        oversizeCheck->setToolTip(wrapTip(tr(
-            "Mux even when the result does not fit the disc size chosen above. Useful when you burn to a "
-            "larger disc than selected or write the image to disk only. The image will not fit the selected "
-            "disc.")));
+        guardCheck->setToolTip(wrapTip(
+            tr("On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones "
+               "most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits "
+               "there and playback runs smoothly across the break. Applies to ISO output.")));
+        guardSpin->setToolTip(
+            wrapTip(tr("How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are "
+                       "safer but take that space away from the movie.")));
+        oversizeCheck->setToolTip(
+            wrapTip(tr("Mux even when the result does not fit the disc size chosen above. Useful when you burn to a "
+                       "larger disc than selected or write the image to disk only. The image will not fit the selected "
+                       "disc.")));
         int rr = 0;
         dl->addWidget(fitLabel, rr, 0);
         dl->addWidget(discSizeCombo, rr++, 1);
@@ -1378,8 +1378,8 @@ TsMuxerWindow::TsMuxerWindow()
         dl->addWidget(oversizeCheck, rr++, 0, 1, 2);
         // guardSpin follows guardCheck, but only where the guard actually does something (see
         // updateDlVisibility below).
-        connect(guardCheck, &QCheckBox::toggled, guardSpin,
-                [this, guardSpin](const bool on) { guardSpin->setEnabled(on && ui->radioButtonBluRayISO->isChecked()); });
+        connect(guardCheck, &QCheckBox::toggled, guardSpin, [this, guardSpin](const bool on)
+                { guardSpin->setEnabled(on && ui->radioButtonBluRayISO->isChecked()); });
         // Add to the main window's Output group. Use ui->verticalLayout_2 directly rather than
         // findChild("verticalLayout_2"): the muxForm progress dialog is a child of this window and has a
         // layout of the same name, so findChild would inject the group into the progress dialog instead.
@@ -1416,24 +1416,24 @@ TsMuxerWindow::TsMuxerWindow()
                 guardSpin->setSuffix(tr(" MB"));
                 // The tooltips need re-setting too, exactly as the BDMV -> ISO tab hook does.
                 // Without this they keep the language the window was built in.
-                const QString fitTip = wrapTip(tr(
-                    "Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick "
-                    "the disc you intend to burn and tsMuxeR checks the finished size against that capacity "
-                    "and warns if it does not fit."));
+                const QString fitTip =
+                    wrapTip(tr("Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick "
+                               "the disc you intend to burn and tsMuxeR checks the finished size against that capacity "
+                               "and warns if it does not fit."));
                 fitLabel->setToolTip(fitTip);
                 discSizeCombo->setToolTip(fitTip);
-                guardCheck->setToolTip(wrapTip(tr(
-                    "On a multi-layer disc the drive switches layers at a fixed point, and those sectors are "
-                    "the ones most likely to burn badly. Switch this on to fill them with zeros so no part of "
-                    "the movie sits there and playback runs smoothly across the break. Applies to ISO "
-                    "output.")));
-                guardSpin->setToolTip(wrapTip(tr(
-                    "How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values "
-                    "are safer but take that space away from the movie.")));
-                oversizeCheck->setToolTip(wrapTip(tr(
-                    "Mux even when the result does not fit the disc size chosen above. Useful when you burn "
-                    "to a larger disc than selected or write the image to disk only. The image will not fit "
-                    "the selected disc.")));
+                guardCheck->setToolTip(wrapTip(
+                    tr("On a multi-layer disc the drive switches layers at a fixed point, and those sectors are "
+                       "the ones most likely to burn badly. Switch this on to fill them with zeros so no part of "
+                       "the movie sits there and playback runs smoothly across the break. Applies to ISO "
+                       "output.")));
+                guardSpin->setToolTip(wrapTip(
+                    tr("How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values "
+                       "are safer but take that space away from the movie.")));
+                oversizeCheck->setToolTip(
+                    wrapTip(tr("Mux even when the result does not fit the disc size chosen above. Useful when you burn "
+                               "to a larger disc than selected or write the image to disk only. The image will not fit "
+                               "the selected disc.")));
             });
     }
 

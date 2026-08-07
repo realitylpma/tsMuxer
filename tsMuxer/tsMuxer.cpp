@@ -269,9 +269,8 @@ void TSMuxer::intAddStream(const std::string& streamName, const std::string& cod
             // Plain TrueHD has no such extension, and giving it 0xfd would announce an
             // extended_stream_id that is not present, which is malformed per H.222.0 Table
             // 2-22. It keeps the private-stream id 0xbd it has always had.
-            m_pesType[tsStreamIndex] = dynamic_cast<TrueHDAC3MergeReader*>(codecReader) != nullptr
-                                           ? PES_INT_AC3_ID
-                                           : PES_PRIVATE_DATA1;
+            m_pesType[tsStreamIndex] =
+                dynamic_cast<TrueHDAC3MergeReader*>(codecReader) != nullptr ? PES_INT_AC3_ID : PES_PRIVATE_DATA1;
         else if (codecName == "A_DTS")
             m_pesType[tsStreamIndex] = PES_INT_DTS_ID;
         else if (codecName == "A_MP3")
