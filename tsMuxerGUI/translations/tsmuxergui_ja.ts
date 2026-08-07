@@ -3898,6 +3898,26 @@ Build the ISO anyway?</source>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>一般的な ~35 MB の欠陥はカバーできますが、実際のメディアではさらに大きな不良ゾーンもよく見られ、欠陥管理されたディスクでは実際の層切り替え位置が計算上のレイヤーブレイクより最大 128 MB 後方になることがあります。288 MB を推奨します。</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>出力の目標ディスクサイズです。サイズ制限なしで多重化する場合は Off のままにします。書き込む予定のディスクを選ぶと、tsMuxeR が完成後のサイズをその容量と照合し、収まらない場合に警告します。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>多層ディスクではドライブが決まった位置で層を切り替えるため、その付近のセクタは書き込み不良が最も起きやすい場所です。有効にするとその領域をゼロで埋め、映像がそこに置かれないようにするので、層の切り替えをまたいでも再生が滑らかになります。ISO 出力に適用されます。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>層の切り替え位置を埋める量です。288 MB で通常の不良領域を覆えます。大きくするほど安全ですが、その分の容量が映像から失われます。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>上で選んだディスクサイズに収まらない場合でも多重化します。選択したものより大きなディスクに書き込む場合や、イメージをハードディスクに書き出すだけの場合に便利です。イメージは選択したディスクには収まりません。</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

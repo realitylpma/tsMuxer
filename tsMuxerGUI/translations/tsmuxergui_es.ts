@@ -3899,6 +3899,26 @@ Mantener la imagen en torno a 66 GB (las dos primeras capas) mejora las probabil
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>Cubre el defecto típico de ~35 MB, pero en los discos reales son frecuentes las zonas dañadas más grandes, y en un disco con gestión de defectos el cambio de capa real puede situarse hasta 128 MB después del salto calculado. Se recomiendan 288 MB.</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>Tamaño de disco objetivo para la salida. Déjalo en Off para multiplexar sin límite de tamaño. Elige el disco que vas a grabar y tsMuxeR comprobará el tamaño final frente a esa capacidad y avisará si no cabe.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>En un disco de varias capas la unidad cambia de capa en un punto fijo, y esos sectores son los que más probablemente se graben mal. Actívalo para rellenarlos con ceros, de modo que ninguna parte de la película quede ahí y la reproducción pase con fluidez por el cambio de capa. Se aplica a la salida ISO.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>Cuánto rellenar en el cambio de capa. 288 MB cubren la zona de defectos habitual. Valores mayores son más seguros pero restan ese espacio a la película.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>Multiplexar aunque el resultado no quepa en el tamaño de disco elegido arriba. Útil si grabas en un disco mayor que el seleccionado o si solo escribes la imagen en el disco duro. La imagen no cabrá en el disco seleccionado.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

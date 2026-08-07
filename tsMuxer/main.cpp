@@ -191,7 +191,34 @@ void detectStreamReader(const char* fileName, MPLSParser* mplsParser, bool isSub
                 LTRACE(LT_INFO, 2, "subTrack: " << (streams[i].codecInfo.codecID == CODEC_V_MPEG4_H264_DEP ? 1 : 2));
         }
         else
-            LTRACE(LT_INFO, 2, "Can't detect stream type");
+        {
+            // No reader accepted this track. When it came from a TS/M2TS we still know what the
+            // PMT called it, so say so instead of leaving the user with a bare failure. These
+            // lines deliberately avoid the "Stream type: "/"Stream ID:   " prefixes the GUI
+            // parses, so an unmuxable track is reported without being offered as selectable.
+            const char* known = nullptr;
+            switch (static_cast<StreamType>(streams[i].containerStreamType))
+            {
+            case StreamType::SUB_IGS:
+                known = "Interactive Graphics, the disc's menu overlay";
+                break;
+            case StreamType::SUB_TGS:
+                known = "Text subtitles (Text-ST)";
+                break;
+            default:
+                break;
+            }
+            if (known)
+                LTRACE(LT_INFO, 2, "Not supported: " << known << " (stream type 0x" << std::hex
+                                                     << streams[i].containerStreamType << std::dec
+                                                     << "). Muxing this stream type is not implemented, "
+                                                        "so the track is skipped.");
+            else if (streams[i].containerStreamType)
+                LTRACE(LT_INFO, 2, "Can't detect stream type (the container declares stream type 0x"
+                                       << std::hex << streams[i].containerStreamType << std::dec << ")");
+            else
+                LTRACE(LT_INFO, 2, "Can't detect stream type");
+        }
     }
 
     AVChapters& chapters = streamInfo.chapters;
@@ -399,7 +426,7 @@ Additional parameters for audio tracks:
 - timeshift         Shift audio track by the given number of milliseconds.
                     Can be negative.
 - down-to-dts       Available only for DTS-HD tracks. Filter out HD part.
-- down-to-ac3       Available only for TRUE-HD tracks. Filter out HD part.
+- down-to-ac3       For TRUE-HD and E-AC3 (DD+) tracks. Keep the AC-3 core, drop the HD part.
 - secondary         Mux as secondary audio. Available for DD+ and DTS-Express.
 - default           Mark this track as the default when muxing to Blu-ray.
 - stretch           Stretch audio by a given factor. Can be a decimal value or a
@@ -557,8 +584,14 @@ All parameters in this group start with two dashes:
                       having a given maximum size. KB, KiB, MB, MiB, GB and GiB
                       are accepted as size units.
 --right-eye           Use base video stream for right eye. Used for 3DBD only.
---start-time          Timestamp of the first video frame. May be defined as 45Khz
+)help"
+                            R"help(--start-time          Timestamp of the first video frame. May be defined as 45Khz
                       clock (just a number) or as time in hh:mm:ss.zzz format.
+                      If not set, muxing starts at 600 s (27000000 ticks). For every
+                      output except plain *.ts, values below 524280 ticks (11.65 s)
+                      are raised to 524280: below that point Blu-ray players cannot
+                      navigate back to the start of the disc (their 32-bit 45 Khz
+                      registers underflow), and commercial discs never start lower.
 --mplsOffset          The number of the first MPLS file.  Used for BD disc mode.
 --m2tsOffset          The number of the first M2TS file.  Used for BD disc mode.
 --insertBlankPL       Add an additional short playlist. Used for cropped video

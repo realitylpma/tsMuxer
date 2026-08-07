@@ -28,6 +28,8 @@ extern unsigned HDR10_metadata[6];
 extern bool isV3();
 extern bool is4K();
 
+class MPEGStreamReader;
+
 static constexpr int MAX_PES_HEADER_LEN = 512;
 
 class TSMuxer final : public AbstractMuxer
@@ -145,6 +147,39 @@ class TSMuxer final : public AbstractMuxer
     int m_lastTSIndex;
     int m_lastPesLen;
     int m_pcrBits;
+    // CBR pacing evaluation skip (writeTSFrames): last m_lastPCR the estimate was made
+    // for, and the m_pcrBits value before which no crossing is possible
+    int64_t m_cbrEvalPCR;
+    int64_t m_cbrNextEvalBits;
+
+    // In-place PES fast path (VBR only): once an accumulation is provably larger than
+    // 65541 bytes (no PES length patch possible), its remaining payload is packetized
+    // straight into m_outBuf instead of being staged in m_pesData first.
+    bool m_inplacePending;
+    int m_pendingStartOffset;       // first TS packet of the pending PES in m_outBuf
+    uint32_t m_pendingStartPktCnt;  // m_muxedPacketCnt at PES start, for the seek index
+    uint32_t m_pendingTsPackets;    // TS packets emitted for the pending PES itself
+    bool m_pendingPayloadStart;     // the next emitted packet is the PES's first
+    bool m_pendingTailPriority;     // priority flag of the open segment
+    int m_pendingTailLen;           // open-segment remainder, < 184 bytes
+    uint8_t m_pendingTail[TS_FRAME_SIZE];
+    uint64_t m_pendingPesPts;  // captured for the seek index (m_pesData is empty later)
+    bool m_pendingPesHasPts;
+    MemoryBlock m_pendingSpill;  // evacuation area for mid-PES PAT/PMT/PCR writes
+    int m_outBufCapacity;
+
+    // note: m_sectorSize is NOT part of the gate; every m2ts mux sets it for the
+    // end-of-file 6 KB rounding, which runs long after any pending PES was finalized
+    [[nodiscard]] bool inplaceEligible() const
+    {
+        return m_cbrBitrate == -1 && m_interliaveBlockSize == 0 && !m_subMode && !m_masterMode;
+    }
+    void ensureOutBufSpace(int needed);
+    void switchToInplace();
+    void emitInplacePacket(const uint8_t* payload, int payloadLen, bool priority);
+    void emitInplacePayload(const uint8_t* data, int64_t len, bool priority);
+    void inplaceCloseSegment();
+    void finalizeInplacePes();
     std::vector<int64_t> m_lastPts;
     std::vector<int64_t> m_firstPts;
 
@@ -154,10 +189,14 @@ class TSMuxer final : public AbstractMuxer
         {
             m_pts = m_dts = ULLONG_MAX;
             m_tsCnt = 0;
+            m_mpegReader = nullptr;
         }
         int64_t m_pts;
         int64_t m_dts;
         int m_tsCnt;
+        // downcast of the stream's codec reader, cached at intAddStream so muxPacket
+        // does not pay a dynamic_cast per AVPacket; nullptr for non-video streams
+        MPEGStreamReader* m_mpegReader;
     };
 
     int64_t m_minDts;

@@ -165,7 +165,7 @@ Parameter         | Description
 ---               | --- 
 timeshift         | Shift audio track by the given number of milliseconds. Can be negative. 
 down-to-dts       | Available only for DTS-HD tracks. Filter out HD part. 
-down-to-ac3       | Available only for TRUE-HD tracks. Filter out HD part. 
+down-to-ac3       | For TRUE-HD and E-AC3 (DD+) tracks. Keep the AC-3 core, drop the HD part. 
 secondary         | Mux as secondary audio.  Available for DD+ and DTS-Express. 
 default           | Mark this track as the default when muxing to Blu-ray.
 stretch           | Stretch audio by a given factor. Can be a decimal value or a fraction (e.g. 25/24). Useful for fixing A/V sync issues caused by frame rate discrepancies.
@@ -283,7 +283,7 @@ Parameter           | Description
 --split-duration    | Split the output into several files, with each of them being <n> seconds long. 
 --split-size        | Split the output into several files, with each of them having a given maximum size. KB, KiB, MB, MiB, GB and GiB are accepted as size units. 
 --right-eye         | Use base video stream for right eye. Used for 3DBD only.
---start-time        | Timestamp of the first video frame. May be defined as 45Khz clock (just a number) or as time in hh:mm:ss.zzz format
+--start-time        | Timestamp of the first video frame. May be defined as 45Khz clock (just a number) or as time in hh:mm:ss.zzz format. If not set, muxing starts at 600 s (27000000 ticks). For every output except plain \*.ts, values below 524280 ticks (11.65 s) are raised to 524280: below that point Blu-ray players cannot navigate back to the start of the disc (their 32-bit 45 Khz registers underflow), and commercial discs never start lower.
 --mplsOffset        | The number of the first MPLS file. Used for BD disc mode.
 --m2tsOffset        | The number of the first M2TS file. Used for BD disc mode.
 --insertBlankPL     | Add an additional short playlist.  Used for cropped video muxed to BD disc.

@@ -645,7 +645,7 @@ void METADemuxer::readClose()
 }
 
 // ---------------------------------------------------------------------------
-// Discovery phase — self-contained probe of all tracks
+// Discovery phase: self-contained probe of all tracks
 // ---------------------------------------------------------------------------
 
 std::vector<StreamDiscoveryData> METADemuxer::discoverStreams() const
@@ -998,6 +998,9 @@ DetectStreamRez METADemuxer::DetectStreamReader(const BufferedReaderManager& rea
             for (int i = 0; i < 24; i++)
                 if (trackRez.lang == langB[i])
                     trackRez.lang = langT[i];
+
+            if (dynamic_cast<TSDemuxer*>(demuxer.get()))
+                trackRez.containerStreamType = acceptedPidMap[itr.first].m_trackType;
 
             if (strStartWith(trackRez.codecInfo.programName, "A_") && dynamic_cast<TSDemuxer*>(demuxer.get()))
             {
@@ -1642,6 +1645,13 @@ int StreamInfo::read()
                     m_lastAVRez = ac3Rez;
                     return ac3Rez;
                 }
+                // the reader protocol prefixes every block with a front pad of
+                // getTmpBufferSize() bytes (the same value this reader was registered
+                // with in createReader); the main path skips it inside setBuffer, and
+                // skipping it here too is what makes the side data actual AC-3 instead
+                // of pad garbage plus a truncated tail
+                if (ac3Data != nullptr)
+                    ac3Data += mergeReader->getTmpBufferSize();
                 mergeReader->setAc3SideData(ac3Data, ac3Cnt);
             }
         }

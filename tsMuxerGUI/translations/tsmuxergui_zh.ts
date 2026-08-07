@@ -3898,6 +3898,26 @@ Build the ISO anyway?</source>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>可覆盖典型的 ~35 MB 缺陷，但实际盘片上出现更大坏区的情况很常见，而且在缺陷管理光盘上，真实的换层位置可能位于计算出的换层点之后最多 128 MB 处。建议使用 288 MB。</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>输出的目标光盘容量。保持 Off 则不限制大小进行混流。选择你打算刻录的光盘后，tsMuxeR 会将最终大小与该容量比对，放不下时发出警告。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>在多层光盘上，光驱会在固定位置切换层，这些扇区最容易刻录出问题。启用后会用零填充这段区域，使影片不会落在那里，播放跨越层切换时更顺畅。适用于 ISO 输出。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>在层切换处填充的大小。288 MB 可覆盖常见的缺陷区域。数值越大越安全，但会占用影片的空间。</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>即使结果放不下上面选择的光盘容量也进行混流。当你刻录到比所选更大的光盘，或只把镜像写到硬盘时很有用。镜像将无法放入所选光盘。</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

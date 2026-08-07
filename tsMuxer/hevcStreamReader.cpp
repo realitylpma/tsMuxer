@@ -3,6 +3,7 @@
 #include <fs/systemlog.h>
 #include <memory>
 
+#include "bitStream.h"
 #include "hevc.h"
 #include "nalUnits.h"
 #include "tsMuxer.h"
@@ -74,7 +75,7 @@ CheckStreamRez HEVCStreamReader::checkStream(uint8_t* buffer, const int len)
             m_spsPpsFound = true;
             if (m_vps->num_units_in_tick)
             {
-                // Lightweight FPS extraction for probing only — the full
+                // Lightweight FPS extraction for probing only. The full
                 // updateFPS() (with logging and 25fps fallback) runs later
                 // during actual muxing in intDecodeNAL().
                 const double fps = correctFps(m_vps->getFPS());
@@ -103,9 +104,21 @@ CheckStreamRez HEVCStreamReader::checkStream(uint8_t* buffer, const int len)
                 return rez;
             break;
         case HevcUnit::NalType::SEI_PREFIX:
-            m_hdr->decodeBuffer(nal, nextNal);
-            if (m_hdr->deserialize() != 0)
-                return rez;
+            // Same guard as intDecodeNAL: one malformed SEI must not take down the probe. This
+            // path runs first and is the one an "analyze" hits, so leaving it unguarded meant a
+            // bad SEI still killed the whole run before muxing even started. The SEI is read
+            // only to detect HDR metadata; the NAL itself passes through untouched either way.
+            try
+            {
+                m_hdr->decodeBuffer(nal, nextNal);
+                if (m_hdr->deserialize() != 0)
+                    return rez;
+            }
+            catch (BitStreamException&)
+            {
+                if (m_seiParseWarns++ == 0)
+                    LTRACE(LT_WARN, 2, "HEVC: malformed SEI prefix NAL ignored while probing the stream");
+            }
             break;
         case HevcUnit::NalType::DVRPU:
         case HevcUnit::NalType::DVEL:
@@ -150,6 +163,22 @@ CheckStreamRez HEVCStreamReader::checkStream(uint8_t* buffer, const int len)
         const size_t frSpsPos = rez.streamDescr.find("Frame rate: not found");
         if (frSpsPos != string::npos)
             rez.streamDescr = rez.streamDescr.substr(0, frSpsPos) + string(" ") + m_vps->getDescription();
+        // Say which track actually carries the Dolby Vision data. With profile 7 the base layer
+        // is plain HDR10 and only the second track holds the RPU, which is otherwise impossible
+        // to tell apart in this listing.
+        // Deliberately reports presence only. Telling full from minimal enhancement layer means
+        // reading disable_residual_flag, which sits about 65 bits into the RPU behind
+        // emulation-prevention removal and ue(v) decoding. The tempting 4-bit field near the
+        // start is vdr_rpu_profile, which distinguishes the profile family (4/5 from 7/8) and is
+        // NOT the layer type, so using it labels a genuine minimal layer as full.
+        if (m_hdr->isDVRPU || m_hdr->isDVEL)
+        {
+            rez.streamDescr += " Dolby Vision";
+            if (m_hdr->isDVRPU)
+                rez.streamDescr += " RPU";
+            if (m_hdr->isDVEL)
+                rez.streamDescr += " EL";
+        }
     }
 
     return rez;
@@ -604,9 +633,19 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                 storeBuffer(m_ppsBuffer, curPos, nextNalWithStartCode);
                 break;
             case HevcUnit::NalType::SEI_PREFIX:
-                m_hdr->decodeBuffer(curPos, nextNal);
-                if (m_hdr->deserialize() != 0)
-                    return rez;
+                try
+                {
+                    m_hdr->decodeBuffer(curPos, nextNal);
+                    if (m_hdr->deserialize() != 0)
+                        return rez;
+                }
+                catch (BitStreamException&)
+                {
+                    // the SEI is parsed only to detect HDR metadata; a malformed one
+                    // must not abort the mux - the NAL passes through unchanged anyway
+                    if (m_seiParseWarns++ == 0)
+                        LTRACE(LT_WARN, 2, "HEVC: malformed SEI prefix NAL ignored (frame " << m_totalFrameNum << ")");
+                }
                 break;
             default:
                 break;

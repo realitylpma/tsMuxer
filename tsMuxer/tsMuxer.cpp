@@ -86,6 +86,18 @@ TSMuxer::TSMuxer(MuxerManager* owner) : AbstractMuxer(owner)
     m_useNewStyleAudioPES = false;
     m_minDts = -1;
     m_pcrBits = 0;
+    m_cbrEvalPCR = -2;  // sentinel: differs from any real m_lastPCR incl. -1
+    m_cbrNextEvalBits = 0;
+    m_inplacePending = false;
+    m_pendingStartOffset = 0;
+    m_pendingStartPktCnt = 0;
+    m_pendingTsPackets = 0;
+    m_pendingPayloadStart = false;
+    m_pendingTailPriority = false;
+    m_pendingTailLen = 0;
+    m_pendingPesPts = 0;
+    m_pendingPesHasPts = false;
+    m_outBufCapacity = 0;
     m_pcr_delta = -1;
     m_patPmtDelta = -1;
     m_firstPts.push_back(-1);
@@ -250,6 +262,16 @@ void TSMuxer::intAddStream(const std::string& streamName, const std::string& cod
     {
         if (codecName == "A_AC3")
             m_pesType[tsStreamIndex] = PES_INT_AC3_ID;
+        else if (codecName == "A_MLP")
+            // Only the AC-3 core merge gets the AC3 id, which --new-audio-pes then maps to
+            // stream id 0xfd as on commercial discs. A merged track writes the matching PES
+            // extension (TrueHDAC3MergeReader::writePESExtension), so 0xfd is honest there.
+            // Plain TrueHD has no such extension, and giving it 0xfd would announce an
+            // extended_stream_id that is not present, which is malformed per H.222.0 Table
+            // 2-22. It keeps the private-stream id 0xbd it has always had.
+            m_pesType[tsStreamIndex] = dynamic_cast<TrueHDAC3MergeReader*>(codecReader) != nullptr
+                                           ? PES_INT_AC3_ID
+                                           : PES_PRIVATE_DATA1;
         else if (codecName == "A_DTS")
             m_pesType[tsStreamIndex] = PES_INT_DTS_ID;
         else if (codecName == "A_MP3")
@@ -406,6 +428,16 @@ void TSMuxer::intAddStream(const std::string& streamName, const std::string& cod
     else
         THROW(ERR_UNKNOWN_CODEC, "Unsupported codec " << codecName << " for TS/M2TS muxing.")
 
+    // cache the downcasts once per stream; muxPacket and writePESPacket run per
+    // AVPacket/PES and previously paid a dynamic_cast each time
+    m_streamInfo[tsStreamIndex].m_mpegReader = dynamic_cast<MPEGStreamReader*>(codecReader);
+    const auto itPid = m_pmt.pidList.find(tsStreamIndex);
+    if (itPid != m_pmt.pidList.end())
+    {
+        itPid->second.m_mpegReader = dynamic_cast<MPEGStreamReader*>(codecReader);
+        itPid->second.m_audioReader = dynamic_cast<SimplePacketizerReader*>(codecReader);
+    }
+
     m_streamInfo[DEFAULT_PCR_PID].m_tsCnt = 0;
     buildNULL();
     buildPAT();
@@ -457,11 +489,13 @@ bool TSMuxer::doFlush(const int64_t newPCR, const int64_t pcrGAP)
             memcpy(newBuff, m_outBuf + roundBufLen, lastBlockSize);
             m_owner->asyncWriteBuffer(this, m_outBuf, roundBufLen, m_muxFile);
             m_outBuf = newBuff;
+            m_outBufCapacity = lastBlockSize;
         }
         else
         {
             m_owner->asyncWriteBuffer(this, m_outBuf, roundBufLen, m_muxFile);
             m_outBuf = nullptr;
+            m_outBufCapacity = 0;
         }
     }
     else
@@ -623,7 +657,9 @@ void TSMuxer::buildPesHeader(const uint8_t pesStreamID, AVPacket& avPacket, int 
 {
     const int64_t curDts = internalClockToPts(avPacket.dts) + m_timeOffset;
     const int64_t curPts = internalClockToPts(avPacket.pts) + m_timeOffset;
-    uint8_t tmpBuffer[2048]{0};
+    // no zero-init: serialize/writePESExtension/writeAdditionData write every byte that
+    // is later copied (bufLen), and this runs once per PES (1200/s for TrueHD)
+    uint8_t tmpBuffer[2048];
     const auto pesPacket = reinterpret_cast<PESPacket*>(tmpBuffer);
     if (curDts != curPts)
         pesPacket->serialize(curPts, curDts, pesStreamID);
@@ -634,7 +670,9 @@ void TSMuxer::buildPesHeader(const uint8_t pesStreamID, AVPacket& avPacket, int 
     m_fullPesPTS = avPacket.pts;
     pesPacket->flagsHi |= PES_DATA_ALIGNMENT;
     // int additionDataSize = avPacket.codec->writePESExtension(pesPacket);
-    const auto ast = dynamic_cast<AbstractStreamReader*>(avPacket.codec);
+    // AbstractStreamReader is the only BaseAbstractStreamReader subclass, so the
+    // per-PES dynamic_cast here was avoidable
+    const auto ast = static_cast<AbstractStreamReader*>(avPacket.codec);
     if (ast)
         ast->writePESExtension(pesPacket, avPacket);
     if (avPacket.flags & AVPacket::IS_COMPLETE_FRAME)
@@ -651,6 +689,12 @@ void TSMuxer::buildPesHeader(const uint8_t pesStreamID, AVPacket& avPacket, int 
 
 void TSMuxer::addData(const uint8_t pesStreamID, const int pid, AVPacket& avPacket)
 {
+    if (m_inplacePending)
+    {
+        // the PES already streams straight into m_outBuf
+        emitInplacePayload(avPacket.data, avPacket.size, (avPacket.flags & AVPacket::PRIORITY_DATA) != 0);
+        return;
+    }
     int beforePesLen = static_cast<int>(m_pesData.size());
     if (m_pesData.size() == 0)
     {
@@ -674,6 +718,12 @@ void TSMuxer::addData(const uint8_t pesStreamID, const int pid, AVPacket& avPack
         else
             m_priorityData.emplace_back(beforePesLen, avPacket.size + pesHeaderLen);
     }
+
+    // 0x10000 + 6 is the largest accumulation whose PES length field still gets patched
+    // at flush time; anything bigger keeps length 0 and can leave the staging buffer now
+    static constexpr int64_t INPLACE_SWITCH_MIN = 0x10000 + 6 + 1;
+    if (static_cast<int64_t>(m_pesData.size()) >= INPLACE_SWITCH_MIN && inplaceEligible())
+        switchToInplace();
 }
 
 void TSMuxer::flushTSFrame() { writePESPacket(); }
@@ -774,8 +824,233 @@ void TSMuxer::gotoNextFile(const int64_t newPts)
     m_curFileStartPts = newPts;
 }
 
+void TSMuxer::ensureOutBufSpace(const int needed)
+{
+    if (m_outBufLen + needed <= m_outBufCapacity)
+        return;
+    // Grow in int64 and refuse rather than wrap. m_outBufLen and the capacity are int, so a
+    // runaway PES (a raw file muxed with the wrong codec, say) would otherwise double past
+    // INT_MAX, wrap negative, then to zero, and this loop would never terminate.
+    int64_t newCap = m_outBufCapacity > 0 ? m_outBufCapacity : m_writeBlockSize + 1024;
+    const int64_t want = static_cast<int64_t>(m_outBufLen) + needed;
+    while (newCap < want) newCap *= 2;
+    if (newCap > INT32_MAX - 1024)
+        THROW(ERR_COMMON, "Pes packet len too large (>2Gb) . Bad stream or invalid codec speciffed")
+    const auto newBuf = new uint8_t[newCap];
+    memcpy(newBuf, m_outBuf, m_outBufLen);
+    delete[] m_outBuf;
+    m_outBuf = newBuf;
+    m_outBufCapacity = newCap;
+}
+
+// One TS packet of the pending PES, replicating the writeTSFrames packet body exactly.
+// payloadLen < 184 produces the segment-final stuffed packet.
+void TSMuxer::emitInplacePacket(const uint8_t* payload, const int payloadLen, const bool priority)
+{
+    // addData's ">100Mb" sanity check is skipped once a PES is pending (it returns early), so
+    // apply the same limit here or a broken stream grows m_outBuf without bound instead of
+    // getting the diagnosis the check exists to give.
+    if (m_outBufLen - m_pendingStartOffset > 100 * 1024 * 1024)
+        THROW(ERR_COMMON, "Pes packet len too large ( >100Mb). Bad stream or invalid codec speciffed.")
+    ensureOutBufSpace(m_frameSize);
+    if (m_m2tsMode)
+    {
+        m_outBufLen += 4;
+        m_processedBlockSize += 4;
+        m_pcrBits += 4 * 8;
+    }
+    const auto initTS = reinterpret_cast<uint32_t*>(m_outBuf + m_outBufLen);
+    *initTS = TSPacket::TS_FRAME_SYNC_BYTE + TSPacket::DATA_EXIST_BIT_VAL;
+    const auto tsPacket = reinterpret_cast<TSPacket*>(m_outBuf + m_outBufLen);
+    int64_t capacity = TS_FRAME_SIZE - tsPacket->getHeaderSize();
+    tsPacket->setPID(m_pesPID);
+    tsPacket->counter = m_streamInfo[m_pesPID].m_tsCnt++;
+    tsPacket->payloadStart = m_pendingPayloadStart;
+    m_pendingPayloadStart = false;
+    tsPacket->priority = priority;
+    if (payloadLen < capacity)
+    {
+        if (!tsPacket->afExists)
+        {
+            tsPacket->afExists = 1;
+            if (capacity - payloadLen == 1)
+            {
+                tsPacket->adaptiveField.length = 0;
+                capacity--;
+            }
+            else
+            {
+                initTS[1] = 0x01;  // zero all af flags, set af len to 1.
+                capacity -= 2;
+            }
+        }
+        memset(reinterpret_cast<uint8_t*>(tsPacket) + tsPacket->getHeaderSize(), 0xff, capacity - payloadLen);
+        tsPacket->adaptiveField.length += static_cast<unsigned>(capacity - payloadLen);
+        capacity = payloadLen;
+    }
+    memcpy(m_outBuf + m_outBufLen + tsPacket->getHeaderSize(), payload, capacity);
+    m_outBufLen += TS_FRAME_SIZE;
+    m_processedBlockSize += TS_FRAME_SIZE;
+    m_pcrBits += TS_FRAME_SIZE * 8;
+    m_muxedPacketCnt[m_muxedPacketCnt.size() - 1]++;
+    m_pendingTsPackets++;
+    // no writeOutBuffer here: flushing is barred while the PES is pending
+}
+
+void TSMuxer::inplaceCloseSegment()
+{
+    if (m_pendingTailLen > 0)
+    {
+        emitInplacePacket(m_pendingTail, m_pendingTailLen, m_pendingTailPriority);
+        m_pendingTailLen = 0;
+    }
+}
+
+// Stream payload bytes of the pending PES: full packets are emitted straight from the
+// source, the sub-packet remainder waits in m_pendingTail for the next chunk.
+void TSMuxer::emitInplacePayload(const uint8_t* data, int64_t len, const bool priority)
+{
+    if (priority != m_pendingTailPriority)
+    {
+        // a segment boundary: legacy emits each priority range with its own
+        // writeTSFrames call, whose final partial packet is stuffed
+        inplaceCloseSegment();
+        m_pendingTailPriority = priority;
+    }
+    constexpr int PAYLOAD = TS_FRAME_SIZE - TSPacket::TS_HEADER_SIZE;  // 184
+    if (m_pendingTailLen > 0)
+    {
+        const int fill = static_cast<int>((std::min)(static_cast<int64_t>(PAYLOAD - m_pendingTailLen), len));
+        memcpy(m_pendingTail + m_pendingTailLen, data, fill);
+        m_pendingTailLen += fill;
+        data += fill;
+        len -= fill;
+        if (m_pendingTailLen < PAYLOAD)
+            return;
+        emitInplacePacket(m_pendingTail, PAYLOAD, priority);
+        m_pendingTailLen = 0;
+    }
+    while (len >= PAYLOAD)
+    {
+        emitInplacePacket(data, PAYLOAD, priority);
+        data += PAYLOAD;
+        len -= PAYLOAD;
+    }
+    if (len > 0)
+    {
+        memcpy(m_pendingTail, data, len);
+        m_pendingTailLen = static_cast<int>(len);
+    }
+}
+
+// The staged accumulation is provably larger than a patchable PES (> 0xFFFF + 6), so its
+// bytes can leave the staging buffer now; the rest of the PES streams straight through.
+void TSMuxer::switchToInplace()
+{
+    // sanity: the segment model needs sorted, non-overlapping priority ranges. Legacy
+    // can produce overlapping ones in exotic cases; those PES simply stay on the old path.
+    int64_t prevEnd = 0;
+    for (const auto& i : m_priorityData)
+    {
+        if (i.first < prevEnd || i.first + i.second > static_cast<int64_t>(m_pesData.size()))
+            return;
+        prevEnd = i.first + i.second;
+    }
+
+    m_inplacePending = true;
+    m_pendingStartOffset = m_outBufLen;
+    m_pendingStartPktCnt = m_muxedPacketCnt[m_muxedPacketCnt.size() - 1];
+    m_pendingTsPackets = 0;
+    m_pendingPayloadStart = true;
+    m_pendingTailLen = 0;
+    m_pendingTailPriority = false;
+    const auto pesPacket = reinterpret_cast<PESPacket*>(m_pesData.data());
+    m_pendingPesHasPts = (pesPacket->flagsLo & 0x80) == 0x80;
+    m_pendingPesPts = m_pendingPesHasPts ? pesPacket->getPts() : 0;
+
+    const uint8_t* base = m_pesData.data();
+    const int64_t total = static_cast<int64_t>(m_pesData.size());
+    int64_t cur = 0;
+    for (const auto& i : m_priorityData)
+    {
+        if (i.first > cur)
+        {
+            // non-priority run before the range: a closed segment
+            emitInplacePayload(base + cur, i.first - cur, false);
+            inplaceCloseSegment();
+        }
+        const bool openEnd = i.first + i.second == total;
+        emitInplacePayload(base + i.first, i.second, true);
+        if (!openEnd)
+            inplaceCloseSegment();  // range followed by more data: it cannot grow anymore
+        cur = i.first + i.second;
+    }
+    if (cur < total)
+        emitInplacePayload(base + cur, total - cur, false);  // the open tail segment
+
+    m_pesData.resize(0);
+    m_priorityData.clear();
+}
+
+void TSMuxer::finalizeInplacePes()
+{
+    inplaceCloseSegment();
+
+    // seek index bookkeeping, replicated from the staged path with the captured values
+    PMTStreamInfo& streamInfo = m_pmt.pidList[m_pesPID];
+    if (m_computeMuxStats && m_pendingPesHasPts)
+    {
+        const uint64_t curPts = m_pendingPesPts;
+        if (streamInfo.m_index.empty())
+            streamInfo.m_index.emplace_back();
+        const auto vCodec = streamInfo.m_mpegReader;
+        const bool SPSRequired = streamInfo.m_codecReader->needSPSForSplit();
+        const auto aCodec = streamInfo.m_audioReader;
+        bool updateIdx = false;
+        if (vCodec && m_pesIFrame)
+        {
+            if (m_pesSpsPps || !SPSRequired)
+            {
+                PMTIndex& curIndex = *streamInfo.m_index.rbegin();
+                if (curIndex.empty() || curPts > curIndex.rbegin()->first)
+                {
+                    curIndex.insert(std::make_pair(curPts, PMTIndexData(m_pendingStartPktCnt, 0)));
+                    updateIdx = true;
+                }
+            }
+            m_lastGopNullCnt = m_nullCnt;
+        }
+        else if (aCodec)
+        {
+            if (m_videoTrackCnt + m_videoSecondTrackCnt == 0)
+                m_lastGopNullCnt = m_nullCnt;
+            PMTIndex& curIndex = *streamInfo.m_index.rbegin();
+            if (curIndex.empty() || curPts - curIndex.rbegin()->first >= 90000)
+            {
+                curIndex.insert(std::make_pair(curPts, PMTIndexData(m_pendingStartPktCnt, 0)));
+                updateIdx = true;
+            }
+        }
+        if (updateIdx)
+        {
+            PMTIndex& curIndex = *streamInfo.m_index.rbegin();
+            assert(curIndex.rbegin()->second.m_frameLen == 0);
+            curIndex.rbegin()->second.m_frameLen = (m_pendingTsPackets + 1) * m_frameSize;
+        }
+    }
+
+    m_inplacePending = false;
+    m_priorityData.clear();
+    while (m_outBufLen >= m_writeBlockSize) writeOutBuffer();  // catch up the flusher
+}
+
 void TSMuxer::writePESPacket()
 {
+    if (m_inplacePending)
+    {
+        finalizeInplacePes();
+        return;
+    }
     if (m_pesData.size() > 0)
     {
         uint32_t tsPackets = 0;
@@ -797,10 +1072,10 @@ void TSMuxer::writePESPacket()
             size_t idxSize = streamInfo.m_index.size();
             if (idxSize == 0)
                 streamInfo.m_index.emplace_back();
-            const auto vCodec = dynamic_cast<MPEGStreamReader*>(streamInfo.m_codecReader);
+            const auto vCodec = streamInfo.m_mpegReader;  // cached at intAddStream
             // bool isH264 = dynamic_cast <H264StreamReader*> (streamInfo.m_codecReader);
             const bool SPSRequired = streamInfo.m_codecReader->needSPSForSplit();
-            const auto aCodec = dynamic_cast<SimplePacketizerReader*>(streamInfo.m_codecReader);
+            const auto aCodec = streamInfo.m_audioReader;  // cached at intAddStream
             if (vCodec && m_pesIFrame)
             {
                 // skip some I-frames for H.264 if no SPS/PPS in a gop
@@ -918,6 +1193,7 @@ void TSMuxer::finishFileBlock(const int64_t newPts, const int64_t newPCR, const 
         else
             flushTSBuffer();
         m_outBuf = new uint8_t[m_writeBlockSize + 1024];
+        m_outBufCapacity = m_writeBlockSize + 1024;
         m_prevM2TSPCROffset = 0;
     }
 
@@ -946,11 +1222,15 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
     m_lastStreamIndex = avPacket.stream_index;
 #endif
 
+    const int tsIndex = m_extIndexToTSIndex[avPacket.stream_index];
+    if (tsIndex == 0)
+        THROW(ERR_TS_COMMON, "Unknown track number " << avPacket.stream_index)
+    StreamInfo& streamInfo = m_streamInfo[tsIndex];  // one map lookup per packet; downcast cached at intAddStream
+
     if (avPacket.stream_index == m_mainStreamIndex)
     {
-        const auto mpegReader = dynamic_cast<MPEGStreamReader*>(avPacket.codec);
-        if (mpegReader)
-            m_additionCLPISize = static_cast<int64_t>(INTERNAL_PTS_FREQ / mpegReader->getFPS());
+        if (streamInfo.m_mpegReader)
+            m_additionCLPISize = static_cast<int64_t>(INTERNAL_PTS_FREQ / streamInfo.m_mpegReader->getFPS());
 
         if (avPacket.duration > 0)
             *m_lastPts.rbegin() = FFMAX(*m_lastPts.rbegin(), avPacket.pts + avPacket.duration);
@@ -984,10 +1264,6 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
     if (m_minDts == -1)
         m_minDts = avPacket.dts;
 
-    const int tsIndex = m_extIndexToTSIndex[avPacket.stream_index];
-    if (tsIndex == 0)
-        THROW(ERR_TS_COMMON, "Unknown track number " << avPacket.stream_index)
-
     auto newPCR = (avPacket.dts - m_minDts) / INT_FREQ_TO_TS_FREQ + m_fixed_pcr_offset;
     if (m_lastPCR == -1)
     {
@@ -996,8 +1272,8 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
     }
 
     bool newPES = false;
-    if (avPacket.dts != m_streamInfo[tsIndex].m_dts || avPacket.pts != m_streamInfo[tsIndex].m_pts ||
-        tsIndex != m_lastTSIndex || avPacket.flags & AVPacket::FORCE_NEW_FRAME)
+    if (avPacket.dts != streamInfo.m_dts || avPacket.pts != streamInfo.m_pts || tsIndex != m_lastTSIndex ||
+        avPacket.flags & AVPacket::FORCE_NEW_FRAME)
     {
         writePESPacket();
         newPES = true;
@@ -1024,13 +1300,36 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
     {
         if (m_interliaveBlockSize == 0 || avPacket.stream_index == m_mainStreamIndex)
         {
-            writePATPMT(newPCR);
-            writePCR(newPCR);
+            if (m_inplacePending)
+            {
+                // On the staged path these tables land in m_outBuf while the PES still
+                // sits in m_pesData, so they belong BEFORE it in the output. Set the
+                // pending bytes aside so the writers (and the m2ts timestamp pass) see
+                // exactly the staged-path buffer state, then put the PES back behind
+                // the new tables.
+                const int pendingLen = m_outBufLen - m_pendingStartOffset;
+                m_pendingSpill.resize(pendingLen);
+                memcpy(m_pendingSpill.data(), m_outBuf + m_pendingStartOffset, pendingLen);
+                m_outBufLen = m_pendingStartOffset;
+                const uint32_t pktsBefore = m_muxedPacketCnt[m_muxedPacketCnt.size() - 1];
+                writePATPMT(newPCR);
+                writePCR(newPCR);
+                m_pendingStartPktCnt += m_muxedPacketCnt[m_muxedPacketCnt.size() - 1] - pktsBefore;
+                m_pendingStartOffset = m_outBufLen;
+                ensureOutBufSpace(pendingLen);
+                memcpy(m_outBuf + m_outBufLen, m_pendingSpill.data(), pendingLen);
+                m_outBufLen += pendingLen;
+            }
+            else
+            {
+                writePATPMT(newPCR);
+                writePCR(newPCR);
+            }
         }
     }
 
-    m_streamInfo[tsIndex].m_pts = avPacket.pts;
-    m_streamInfo[tsIndex].m_dts = avPacket.dts;
+    streamInfo.m_pts = avPacket.pts;
+    streamInfo.m_dts = avPacket.dts;
     uint8_t pesStreamID = m_pesType[tsIndex];
     if (pesStreamID <= SYSTEM_START_CODE)
     {
@@ -1042,11 +1341,10 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
 
     addData(pesStreamID, tsIndex, avPacket);
 
-    const auto mpegReader = dynamic_cast<MPEGStreamReader*>(avPacket.codec);
     if (avPacket.duration > 0)
         m_endStreamDTS = avPacket.dts + avPacket.duration;
-    else if (mpegReader)
-        m_endStreamDTS = avPacket.dts + static_cast<int64_t>(INTERNAL_PTS_FREQ / mpegReader->getFPS());
+    else if (streamInfo.m_mpegReader)
+        m_endStreamDTS = avPacket.dts + static_cast<int64_t>(INTERNAL_PTS_FREQ / streamInfo.m_mpegReader->getFPS());
     else
         m_endStreamDTS = avPacket.dts;
 
@@ -1068,17 +1366,34 @@ int TSMuxer::writeTSFrames(const int pid, const uint8_t* buffer, const int64_t l
     {
         if (m_cbrBitrate != -1 && m_lastPCR != -1)
         {
-            const auto newPCR = llround(static_cast<double>(m_lastPCR + m_pcrBits) * 90000.0 / m_cbrBitrate);
-            if (newPCR - m_lastPCR >= m_pcr_delta && m_lastPCR != -1)
+            // The pacing value is monotone in m_pcrBits (90000/m_cbrBitrate ticks per
+            // bit), so after a miss the earliest possible crossing is a computable number
+            // of bits away; skip the floating point evaluation until then. The original
+            // expression still decides every crossing, so the output is unchanged.
+            if (m_lastPCR != m_cbrEvalPCR || m_pcrBits >= m_cbrNextEvalBits)
             {
-                m_pcrBits = 0;
-                writePATPMT(newPCR);
-                writePCR(newPCR);
-                if (m_lastPESDTS != -1 && m_lastPCR > m_lastPESDTS)
+                const auto newPCR = llround(static_cast<double>(m_lastPCR + m_pcrBits) * 90000.0 / m_cbrBitrate);
+                if (newPCR - m_lastPCR >= m_pcr_delta && m_lastPCR != -1)
                 {
-                    LTRACE(LT_ERROR, 2,
-                           "VBV buffer overflow at position " << (double)(m_lastPCR - m_fixed_pcr_offset) / 90000.0
-                                                              << " sec");
+                    m_pcrBits = 0;
+                    writePATPMT(newPCR);
+                    writePCR(newPCR);
+                    if (m_lastPESDTS != -1 && m_lastPCR > m_lastPESDTS)
+                    {
+                        LTRACE(LT_ERROR, 2,
+                               "VBV buffer overflow at position " << (double)(m_lastPCR - m_fixed_pcr_offset) / 90000.0
+                                                                  << " sec");
+                    }
+                    m_cbrEvalPCR = m_lastPCR;
+                    m_cbrNextEvalBits = 0;  // fresh interval: evaluate on the next packet
+                }
+                else
+                {
+                    const int64_t missingTicks = m_pcr_delta - (newPCR - m_lastPCR);
+                    // conservative one tick guard against the llround boundary
+                    const int64_t skipBits = missingTicks > 1 ? (missingTicks - 1) * m_cbrBitrate / 90000 : 0;
+                    m_cbrEvalPCR = m_lastPCR;
+                    m_cbrNextEvalBits = m_pcrBits + skipBits;
                 }
             }
         }
@@ -1296,13 +1611,18 @@ void TSMuxer::writeSIT()
 
 void TSMuxer::writeOutBuffer()
 {
+    if (m_inplacePending)
+        return;  // never flush while a PES is written in place: its bytes must stay movable
     if (m_outBufLen >= m_writeBlockSize)
     {
         int toFileLen = m_writeBlockSize & ~(MuxerManager::PHYSICAL_SECTOR_SIZE - 1);
         if (m_owner->isAsyncMode())
         {
-            const auto newBuf = new uint8_t[m_writeBlockSize + 1024];
+            // the remainder can exceed one block right after an in-place PES finalized
+            const int newCap = FFMAX(m_writeBlockSize, m_outBufLen - toFileLen) + 1024;
+            const auto newBuf = new uint8_t[newCap];
             memcpy(newBuf, m_outBuf + toFileLen, m_outBufLen - toFileLen);
+            m_outBufCapacity = newCap;
             if (m_m2tsMode)
             {
                 if (m_prevM2TSPCROffset >= toFileLen && m_m2tsDelayBlocks.empty())
@@ -1493,6 +1813,7 @@ void TSMuxer::setMuxFormat(const std::string& format)
     m_m2tsMode = format == "M2TS" || format == "M2T" || format == "MTS" || format == "SSIF";
     m_writeBlockSize = m_m2tsMode ? DEFAULT_FILE_BLOCK_SIZE : TS188_ROUND_BLOCK_SIZE;
     m_outBuf = new uint8_t[m_writeBlockSize + 1024];
+    m_outBufCapacity = m_writeBlockSize + 1024;
     m_frameSize = m_m2tsMode ? 192 : 188;
     if (m_m2tsMode)
         m_sectorSize = 1024 * 6;

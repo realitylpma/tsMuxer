@@ -46,6 +46,12 @@ int MLPStreamReader::decodeFrame(uint8_t* buff, uint8_t* end, int& skipBytes, in
 {
     skipBytes = 0;
     skipBeforeBytes = 0;
+    // Below MLP_FULL_HEADER_LEN the codec cannot tell a broken access unit from one that is
+    // merely cut off by the end of the read block, and answers false either way. Returning 0
+    // here would make the caller resync to the next major sync and drop everything up to it,
+    // so ask for more data instead and let the access unit be carried into the next block.
+    if (end - buff < MLP_FULL_HEADER_LEN)
+        return NOT_ENOUGH_BUFFER;
     if (MLPCodec::decodeFrame(buff, end))
         return getFrameSize(buff);
     return 0;
@@ -102,7 +108,10 @@ int MLPStreamReader::readPacket(AVPacket& avPacket)
             return rez;
 
         // thg packet
-        avPacket.dts = avPacket.pts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
+        // m_samplerate stays 0 until a major sync decodes; a stream that never produces one
+        // must not divide by it.
+        if (m_samplerate)
+            avPacket.dts = avPacket.pts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
 
         m_totalTHDSamples += m_samples;
         m_demuxedTHDSamples += m_samples;
@@ -119,7 +128,7 @@ int MLPStreamReader::flushPacket(AVPacket& avPacket)
     const int rez = SimplePacketizerReader::flushPacket(avPacket);
     if (rez > 0)
     {
-        if (!(avPacket.flags & AVPacket::PRIORITY_DATA))
+        if (!(avPacket.flags & AVPacket::PRIORITY_DATA) && m_samplerate)
             avPacket.pts = avPacket.dts =
                 m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;  // replace time to a next HD packet
     }

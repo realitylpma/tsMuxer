@@ -7,6 +7,7 @@
 #include <types/types.h>
 
 #include "bitStream.h"
+#include "startcode.h"
 #include "vod_common.h"
 
 enum class VC1Code
@@ -64,20 +65,8 @@ class VC1Unit
 
     static uint8_t* findNextMarker(uint8_t* buffer, uint8_t* end)
     {
-        for (buffer += 2; buffer < end;)
-        {
-            if (*buffer > 1)
-                buffer += 3;
-            else if (*buffer == 0)
-                buffer++;
-            else  // *buffer == 1
-            {
-                if (buffer[-2] == 0 && buffer[-1] == 0)
-                    return buffer - 2;
-                buffer += 3;
-            }
-        }
-        return end;
+        uint8_t* const marker = findStartCodeMarker(buffer, end);
+        return marker != nullptr ? marker - 2 : end;
     }
 
     int64_t vc1_unescape_buffer(uint8_t* src, const int64_t size)

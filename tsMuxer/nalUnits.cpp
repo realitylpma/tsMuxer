@@ -7,6 +7,7 @@
 
 #include "bitStream.h"
 #include "nalUnits.h"
+#include "startcode.h"
 #include "vod_common.h"
 
 static constexpr uint8_t BDROM_METADATA_GUID[] = "\x17\xee\x8c\x60\xf8\x4d\x11\xd9\x8c\xd6\x08\x00\x20\x0c\x9a\x66";
@@ -60,43 +61,18 @@ uint8_t* NALUnit::addStartCode(uint8_t* buffer, const uint8_t* boundStart)
 
 uint8_t* NALUnit::findNextNAL(uint8_t* buffer, uint8_t* end)
 {
-    for (buffer += 2; buffer < end;)
-    {
-        if (*buffer > 1)
-            buffer += 3;
-        else if (*buffer == 0)
-            buffer++;
-        else  // *buffer == 1
-        {
-            if (buffer[-2] == 0 && buffer[-1] == 0)
-                return buffer + 1;
-            buffer += 3;
-        }
-    }
-    return end;
+    uint8_t* const marker = findStartCodeMarker(buffer, end);
+    return marker != nullptr ? marker + 1 : end;
 }
 
 uint8_t* NALUnit::findNALWithStartCode(uint8_t* buffer, uint8_t* end, const bool longCodesAllowed)
 {
-    const uint8_t* bufStart = buffer;
-    for (buffer += 2; buffer < end;)
-    {
-        if (*buffer > 1)
-            buffer += 3;
-        else if (*buffer == 0)
-            buffer++;
-        else  // *buffer == 1
-        {
-            if (buffer[-2] == 0 && buffer[-1] == 0)
-            {
-                if (longCodesAllowed && buffer - 3 >= bufStart && buffer[-3] == 0)
-                    return buffer - 3;
-                return buffer - 2;
-            }
-            buffer += 3;
-        }
-    }
-    return end;
+    uint8_t* const marker = findStartCodeMarker(buffer, end);
+    if (marker == nullptr)
+        return end;
+    if (longCodesAllowed && marker - 3 >= buffer && marker[-3] == 0)
+        return marker - 3;
+    return marker - 2;
 }
 
 int NALUnit::encodeNAL(const uint8_t* srcBuffer, const uint8_t* srcEnd, uint8_t* dstBuffer, size_t dstBufferSize)

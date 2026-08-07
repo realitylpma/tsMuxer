@@ -60,6 +60,25 @@ MuxerManager::~MuxerManager() = default;
 
 void MuxerManager::preinitMux(const std::string& outFileName, FileFactory* fileFactory)
 {
+    // Blu-ray navigation needs the mux start time at or above 524280 ticks of the 45 kHz
+    // clock (11.65 s). Below that, players subtract the decoder preroll from timestamps
+    // near zero and their 32-bit 45 kHz registers underflow, so skipping back to the start
+    // of the disc fails. Commercial discs never master lower (Universal uses exactly
+    // 524280). Raise a lower explicit value for every output except plain *.ts; an absent
+    // --start-time already falls back to the safe 600 s default before this point.
+    static constexpr int64_t MIN_BD_PTS_OFFSET = 524280ll * 2;  // 45 kHz -> 90 kHz ticks
+    // Only a transport-stream mux carries this offset at all. Matroska and the single-file
+    // muxers ignore m_ptsOffset, so warning about Blu-ray navigation and rewriting the value
+    // for a .mkv would be noise about something that cannot happen.
+    const std::string outExt = strToLowerCase(extractFileExt(outFileName));
+    const bool tsFamilyOutput = outExt != "mkv" && outExt != "mka" && outExt != "mks" && outExt != "ts";
+    if (!m_demuxMode && tsFamilyOutput && m_ptsOffset < MIN_BD_PTS_OFFSET)
+    {
+        LTRACE(LT_WARN, 2,
+               "--start-time below 524280 (45 kHz clock) breaks Blu-ray navigation; raised to 524280 (11.65 s)");
+        m_ptsOffset = MIN_BD_PTS_OFFSET;
+    }
+
     vector<StreamInfo>& ci = m_metaDemuxer.getCodecInfo();
     bool mvcTrackFirst = false;
     bool firstH264Track = true;

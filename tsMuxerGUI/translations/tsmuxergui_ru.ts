@@ -3899,6 +3899,26 @@ Build the ISO anyway?</source>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>Покрывает типичный дефект ~35 MB, но на реальных носителях часто встречаются более крупные сбойные зоны, а на диске с управлением дефектами фактическая смена слоя может находиться на расстоянии до 128 MB после расчётной точки перехода. Рекомендуется 288 MB.</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>Целевой размер диска для вывода. Оставьте Off, чтобы мультиплексировать без ограничения размера. Выберите диск, который собираетесь записывать: tsMuxeR сверит итоговый размер с этой ёмкостью и предупредит, если он не помещается.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>На многослойном диске привод переключает слои в фиксированной точке, и именно эти секторы чаще всего записываются с ошибками. Включите, чтобы заполнить их нулями: тогда там не окажется части фильма и воспроизведение пройдёт через смену слоя без рывков. Применяется к выводу в ISO.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>Сколько заполнять на стыке слоёв. 288 МБ покрывают обычную зону дефектов. Большие значения надёжнее, но отнимают это место у фильма.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>Мультиплексировать, даже если результат не помещается в выбранный выше размер диска. Полезно, если вы записываете на диск большего размера или пишете образ только на жёсткий диск. Образ не поместится на выбранный диск.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

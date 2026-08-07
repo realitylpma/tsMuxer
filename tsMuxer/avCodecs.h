@@ -42,12 +42,18 @@ struct CodecInfo
 
 struct CheckStreamRez
 {
-    CheckStreamRez() : trackID(0), delay(0), multiSubStream(false), isSecondary(false), unused(false) {}
+    CheckStreamRez()
+        : trackID(0), delay(0), containerStreamType(0), multiSubStream(false), isSecondary(false), unused(false)
+    {
+    }
     CodecInfo codecInfo;
     std::string streamDescr;
     std::string lang;
     int32_t trackID;
     int64_t delay;  // auto delay for audio
+    // stream_coding_type as declared by a TS/M2TS PMT, 0 for other containers. Kept so that a
+    // track no reader accepts can still be named in diagnostics instead of just failing.
+    int containerStreamType;
 
     bool multiSubStream;
     bool isSecondary;

@@ -58,7 +58,8 @@ uint64_t MLPCodec::getFrameDuration() const { return INTERNAL_PTS_FREQ * m_sampl
 uint8_t* MLPCodec::findFrame(uint8_t* buffer, const uint8_t* end)
 {
     uint8_t* curBuf = buffer;
-    while (curBuf < end)
+    // curBuf[4..6] is read below, so stop 7 bytes short of end rather than at end.
+    while (curBuf + 7 <= end)
     {
         if (curBuf[4] == 0xf8 && curBuf[5] == 0x72 && curBuf[6] == 0x6f)
             return curBuf;
@@ -94,7 +95,7 @@ bool MLPCodec::isMinorSync(const uint8_t* buffer, uint8_t* end) const
 // returns true if TrueHD or MLP frame, false on error
 bool MLPCodec::decodeFrame(uint8_t* buffer, uint8_t* end)
 {
-    if (end - buffer < 21)
+    if (end - buffer < MLP_FULL_HEADER_LEN)
         return false;
     BitStreamReader reader{};
     reader.setBuffer(buffer + 4, end);
@@ -154,5 +155,10 @@ bool MLPCodec::decodeFrame(uint8_t* buffer, uint8_t* end)
     m_bitrate =
         (reader.getBits<uint16_t>(15) /* peak_data_rate */ * m_samplerate + 8) >> 4;  // + 8 is for rounding to nearest
     m_substreams = reader.getBits<uint8_t>(4);
+    // isMinorSync walks 4 + 4 * m_substreams bytes. The field is 4 bits wide, so a corrupt major
+    // sync could claim 15 and send it 64 bytes into a buffer only guaranteed to hold
+    // MLP_FULL_HEADER_LEN. Blu-ray TrueHD uses at most 4 substreams.
+    if (m_substreams > 4)
+        return false;
     return true;
 }

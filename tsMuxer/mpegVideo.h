@@ -7,6 +7,7 @@
 
 #include "avPacket.h"
 #include "bitStream.h"
+#include "startcode.h"
 #include "vod_common.h"
 
 static constexpr double frame_rates[] = {0.0,  23.97602397602397, 24.0, 25.0, 29.97002997002997, 30,
@@ -42,21 +43,8 @@ class MPEGHeader
    public:
     static uint8_t* findNextMarker(uint8_t* buffer, uint8_t* end)
     {
-        // uint8_t* bufStart = buffer;
-        for (buffer += 2; buffer < end;)
-        {
-            if (*buffer > 1)
-                buffer += 3;
-            else if (*buffer == 0)
-                buffer++;
-            else  // *buffer == 1
-            {
-                if (buffer[-2] == 0 && buffer[-1] == 0)
-                    return buffer - 2;
-                buffer += 3;
-            }
-        }
-        return end;
+        uint8_t* const marker = findStartCodeMarker(buffer, end);
+        return marker != nullptr ? marker - 2 : end;
     }
 
    protected:

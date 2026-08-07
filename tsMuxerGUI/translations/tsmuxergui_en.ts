@@ -3894,6 +3894,26 @@ Build the ISO anyway?</source>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

@@ -205,6 +205,8 @@ struct TSPacket
 };
 
 class AbstractStreamReader;
+class MPEGStreamReader;
+class SimplePacketizerReader;
 
 struct BluRayCoarseInfo
 {
@@ -236,7 +238,9 @@ struct PMTStreamInfo final
           m_esInfoData(),
           m_lang(),
           isSecondary(false),
-          m_codecReader()
+          m_codecReader(),
+          m_mpegReader(),
+          m_audioReader()
     {
     }
 
@@ -252,6 +256,8 @@ struct PMTStreamInfo final
         memcpy(m_lang, lang.c_str(), lang.size() < 3 ? lang.size() : 3);
         m_pmtPID = -1;
         isSecondary = secondary;
+        m_mpegReader = nullptr;
+        m_audioReader = nullptr;
     }
 
     StreamType m_streamType;
@@ -265,6 +271,10 @@ struct PMTStreamInfo final
     // ---------------------
     std::vector<PMTIndex> m_index;  // blu-ray seek index. key=number of tsFrame. value=information about key frame
     AbstractStreamReader* m_codecReader;
+    // downcasts of m_codecReader, cached at stream registration so writePESPacket does
+    // not pay two dynamic_casts per PES frame; nullptr when the reader is another type
+    MPEGStreamReader* m_mpegReader;
+    SimplePacketizerReader* m_audioReader;
 };
 
 typedef std::map<int, PMTStreamInfo> PIDListMap;

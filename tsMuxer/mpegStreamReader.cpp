@@ -17,6 +17,9 @@ static constexpr int UNIT_SKIPPED = 5;
 
 using namespace std;
 
+// The 01 byte of the start code a findNALWithStartCode result points at.
+static uint8_t* markerFromResult(uint8_t* r) { return r[2] == 1 ? r + 2 : r + 3; }
+
 void MPEGStreamReader::setBuffer(uint8_t* data, const uint32_t dataLen, const bool lastBlock)
 {
     if (lastBlock)
@@ -36,6 +39,8 @@ void MPEGStreamReader::setBuffer(uint8_t* data, const uint32_t dataLen, const bo
 int MPEGStreamReader::flushPacket(AVPacket& avPacket)
 {
     m_eof = true;
+    m_cachedMarker = nullptr;  // flush repoints m_curPos/m_bufEnd directly
+    m_scanHighWater = nullptr;
     avPacket.codec = this;
     avPacket.duration = 0;
     avPacket.data = nullptr;
@@ -90,6 +95,14 @@ void MPEGStreamReader::storeBufferRest()
         m_lastDecodedPos = m_tmpBuffer + (m_lastDecodedPos - m_curPos);
     else
         m_lastDecodedPos = nullptr;
+    if (m_cachedMarker > m_curPos)
+        m_cachedMarker = m_tmpBuffer + (m_cachedMarker - m_curPos);
+    else
+        m_cachedMarker = nullptr;
+    if (m_scanHighWater > m_curPos)
+        m_scanHighWater = m_tmpBuffer + (m_scanHighWater - m_curPos);
+    else
+        m_scanHighWater = nullptr;
     m_curPos = m_bufEnd;
 }
 
@@ -124,17 +137,37 @@ int MPEGStreamReader::readPacket(AVPacket& avPacket)
             return NEED_MORE_DATA;
     }
 
-    const uint8_t* nextNal =
-        NALUnit::findNALWithStartCode((std::min)(m_curPos + 3, m_bufEnd), m_bufEnd, m_longCodesAllowed);
-    if (nextNal == m_bufEnd)
+    // Existence check: is a complete unit buffered? The result position is not needed,
+    // only whether one exists. Cached across calls so the chunked emission of a NAL larger
+    // than MAX_AV_PACKET_SIZE does not re-walk its whole tail on every call (quadratic in
+    // the NAL size), and a refill only rescans the new bytes.
+    uint8_t* const scanStartA = (std::min)(m_curPos + 3, m_bufEnd);
+    if (!(m_cachedMarker && m_cachedMarker >= scanStartA + 2 && m_cachedMarker < m_bufEnd))
     {
-        storeBufferRest();
-        return NEED_MORE_DATA;
+        uint8_t* from = scanStartA;
+        if (!m_cachedMarker && m_scanHighWater && m_scanHighWater <= m_bufEnd && m_scanHighWater - 3 > from)
+            from = m_scanHighWater - 3;  // nothing before the old buffer end: rescan only the tail
+        uint8_t* nextNal = NALUnit::findNALWithStartCode(from, m_bufEnd, m_longCodesAllowed);
+        if (nextNal == m_bufEnd)
+        {
+            m_cachedMarker = nullptr;
+            m_scanHighWater = m_bufEnd;
+            storeBufferRest();
+            return NEED_MORE_DATA;
+        }
+        m_cachedMarker = markerFromResult(nextNal);
+        m_scanHighWater = nullptr;
     }
 
     int isNal = bufFromNAL();
     if (isNal)
     {
+        // decodeNal can rewrite the SPS/VPS in place and SHIFT the buffer tail
+        // (updateStreamFps), which would leave the cached positions stale. Drop them;
+        // the cache only needs to survive the mid-NAL chunk calls, which skip this block.
+        m_cachedMarker = nullptr;
+        m_scanHighWater = nullptr;
+
         const int64_t prevDts = m_curDts;
         m_shortStartCodes = isNal < 4;
         int rez;

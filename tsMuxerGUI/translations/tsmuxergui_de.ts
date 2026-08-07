@@ -3898,6 +3898,26 @@ ISO trotzdem erstellen?</translation>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>Deckt den typischen Defekt von ~35 MB ab, aber größere defekte Zonen sind auf echten Medien häufig, und auf einer Disc mit Defektmanagement kann der tatsächliche Layerwechsel bis zu 128 MB hinter dem berechneten Layer-Break liegen. 288 MB empfohlen.</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>Zielgröße des Datenträgers für die Ausgabe. Auf Off lassen, um ohne Größenbegrenzung zu muxen. Wähle den Datenträger, den du brennen willst; tsMuxeR prüft die fertige Größe gegen diese Kapazität und warnt, wenn sie nicht passt.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>Auf einem Datenträger mit mehreren Schichten wechselt das Laufwerk an einer festen Stelle die Schicht, und genau diese Sektoren werden am ehesten fehlerhaft gebrannt. Diese Option füllt sie mit Nullen, damit dort kein Teil des Films liegt und die Wiedergabe über den Schichtwechsel hinweg flüssig bleibt. Gilt für die ISO-Ausgabe.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>Wie viel am Schichtwechsel gefüllt wird. 288 MB decken den üblichen Fehlerbereich ab. Größere Werte sind sicherer, nehmen dem Film aber diesen Platz weg.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>Auch dann muxen, wenn das Ergebnis nicht auf die oben gewählte Datenträgergröße passt. Nützlich, wenn du auf einen größeren Datenträger brennst als ausgewählt oder das Abbild nur auf die Festplatte schreibst. Das Abbild passt dann nicht auf den gewählten Datenträger.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

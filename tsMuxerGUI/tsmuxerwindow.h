@@ -100,6 +100,7 @@ class TsMuxerWindow : public QWidget
     void at_sectionCheckstateChanged(Qt::CheckState state);
     void updateMuxTime1();
     void updateMuxTime2();
+    void snapMuxTimeToBdMinimum();
     void onLanguageComboBoxIndexChanged(int);
     template <typename OnCodecListReadyFn, typename PostActionSignal, typename PostActionFn>
     void processAddFileList(OnCodecListReadyFn onCodecListReady, PostActionSignal postActionSignal,

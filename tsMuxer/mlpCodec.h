@@ -5,6 +5,13 @@
 
 static constexpr int MLP_HEADER_LEN = 7;
 
+// Smallest buffer MLPCodec::decodeFrame() can reach a verdict on for a MAJOR SYNC: the 4 byte
+// access unit header plus 132 bits of major sync header, which ends inside byte 20. Below this
+// it can only answer "false", which is not the same as "broken", hence NOT_ENOUGH_BUFFER.
+// Note this does NOT bound isMinorSync(), which walks 4 + 4 * m_substreams bytes; that is why
+// m_substreams is clamped where it is parsed.
+static constexpr int MLP_FULL_HEADER_LEN = 21;
+
 enum class MlpSubType
 {
     stUnknown,

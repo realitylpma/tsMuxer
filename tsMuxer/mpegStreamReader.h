@@ -19,6 +19,8 @@ class MPEGStreamReader : public AbstractStreamReader
         m_lastDecodeOffset = LONG_MAX;
         m_tmpBuffer = new uint8_t[TMP_BUFFER_SIZE];
         m_lastDecodedPos = nullptr;
+        m_cachedMarker = nullptr;
+        m_scanHighWater = nullptr;
         m_curPts = m_curDts = PTS_CONST_OFFSET;
         m_processedBytes = 0;
         m_totalFrameNum = 0;
@@ -80,6 +82,13 @@ class MPEGStreamReader : public AbstractStreamReader
     int64_t m_pcrIncPerFrame;
     int64_t m_pcrIncPerField;
     const uint8_t* m_lastDecodedPos;
+    // start-code scan cache for readPacket: m_cachedMarker points at the 01 byte of the
+    // next start code ahead of m_curPos (nullptr = unknown); m_scanHighWater is the old
+    // m_bufEnd a scan already covered without finding one. Both rebased like
+    // m_lastDecodedPos in storeBufferRest. Without this, every readPacket call re-walked
+    // the remaining NAL tail (quadratic for NALs above MAX_AV_PACKET_SIZE).
+    uint8_t* m_cachedMarker;
+    uint8_t* m_scanHighWater;
     int m_totalFrameNum;
     virtual double getStreamFPS(void* curNalUnit) = 0;
     void updateFPS(void* curNALUnit, uint8_t* buff, uint8_t* nextNal, int oldSPSLen);

@@ -488,6 +488,8 @@ TsMuxerWindow::TsMuxerWindow()
     connect(ui->editDelay, spinBoxValueChanged, this, &TsMuxerWindow::onEditDelayChanged);
     connect(ui->muxTimeEdit, &QTimeEdit::timeChanged, this, &TsMuxerWindow::updateMuxTime1);
     connect(ui->muxTimeClock, spinBoxValueChanged, this, &TsMuxerWindow::updateMuxTime2);
+    connect(ui->muxTimeEdit, &QTimeEdit::editingFinished, this, &TsMuxerWindow::snapMuxTimeToBdMinimum);
+    connect(ui->muxTimeClock, &QSpinBox::editingFinished, this, &TsMuxerWindow::snapMuxTimeToBdMinimum);
     connect(ui->fontButton, &QPushButton::clicked, this, &TsMuxerWindow::onFontBtnClicked);
     connect(ui->colorButton, &QPushButton::clicked, this, &TsMuxerWindow::onColorBtnClicked);
     connect(ui->checkBoxVBR, &QPushButton::clicked, this, &TsMuxerWindow::onGeneralCheckboxClicked);
@@ -1349,21 +1351,53 @@ TsMuxerWindow::TsMuxerWindow()
         auto* oversizeCheck = new QCheckBox(tr("Allow oversize"), dlBox);
         oversizeCheck->setObjectName("dlAllowOversize");
         auto* fitLabel = new QLabel(tr("Fit to disc:"), dlBox);
+        // The BDMV -> ISO tab explains every one of its controls; this group had nothing at all, so the
+        // same three questions came up here. Text only, no behaviour change.
+        const QString fitTip = wrapTip(tr(
+            "Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc "
+            "you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it "
+            "does not fit."));
+        fitLabel->setToolTip(fitTip);
+        discSizeCombo->setToolTip(fitTip);
+        guardCheck->setToolTip(wrapTip(tr(
+            "On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones "
+            "most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits "
+            "there and playback runs smoothly across the break. Applies to ISO output.")));
+        guardSpin->setToolTip(wrapTip(tr(
+            "How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are "
+            "safer but take that space away from the movie.")));
+        oversizeCheck->setToolTip(wrapTip(tr(
+            "Mux even when the result does not fit the disc size chosen above. Useful when you burn to a "
+            "larger disc than selected or write the image to disk only. The image will not fit the selected "
+            "disc.")));
         int rr = 0;
         dl->addWidget(fitLabel, rr, 0);
         dl->addWidget(discSizeCombo, rr++, 1);
         dl->addWidget(guardCheck, rr, 0);
         dl->addWidget(guardSpin, rr++, 1);
         dl->addWidget(oversizeCheck, rr++, 0, 1, 2);
-        connect(guardCheck, &QCheckBox::toggled, guardSpin, &QWidget::setEnabled);
+        // guardSpin follows guardCheck, but only where the guard actually does something (see
+        // updateDlVisibility below).
+        connect(guardCheck, &QCheckBox::toggled, guardSpin,
+                [this, guardSpin](const bool on) { guardSpin->setEnabled(on && ui->radioButtonBluRayISO->isChecked()); });
         // Add to the main window's Output group. Use ui->verticalLayout_2 directly rather than
         // findChild("verticalLayout_2"): the muxForm progress dialog is a child of this window and has a
         // layout of the same name, so findChild would inject the group into the progress dialog instead.
         ui->verticalLayout_2->addWidget(dlBox);
         // These options only apply to Blu-ray ISO / folder output (see the meta builder), so show the group
         // only for those output modes and keep it hidden for TS / M2TS / MKV / AVCHD / Demux.
-        auto updateDlVisibility = [this, dlBox]()
-        { dlBox->setVisible(ui->radioButtonBluRayISO->isChecked() || ui->radioButtonBluRay->isChecked()); };
+        auto updateDlVisibility = [this, dlBox, guardCheck, guardSpin]()
+        {
+            const bool iso = ui->radioButtonBluRayISO->isChecked();
+            dlBox->setVisible(iso || ui->radioButtonBluRay->isChecked());
+            // The layer-break guard writes zero padding into the disc IMAGE: BlurayHelper::open
+            // only applies it when the output extension is .iso. A Blu-ray FOLDER has no image and
+            // no layer break, so leaving the control usable there let you tick it and set a size
+            // that was then silently ignored. Fit to disc and Allow oversize DO apply to folder
+            // output, since the capacity check runs for any disc type, so those stay enabled.
+            guardCheck->setEnabled(iso);
+            guardSpin->setEnabled(iso && guardCheck->isChecked());
+        };
         updateDlVisibility();
         connect(ui->radioButtonBluRayISO, &QAbstractButton::toggled, dlBox,
                 [updateDlVisibility](bool) { updateDlVisibility(); });
@@ -1372,13 +1406,34 @@ TsMuxerWindow::TsMuxerWindow()
 
         // Re-translate this groupbox on a runtime language change (see the BDMV->ISO tab hook above).
         m_retranslateHooks.push_back(
-            [dlBox, fitLabel, guardCheck, oversizeCheck, discSizeCombo]()
+            [dlBox, fitLabel, guardCheck, guardSpin, oversizeCheck, discSizeCombo]()
             {
                 dlBox->setTitle(tr("Dual-layer (BD-R/RE DL)"));
                 fitLabel->setText(tr("Fit to disc:"));
                 guardCheck->setText(tr("Layer-break guard"));
                 oversizeCheck->setText(tr("Allow oversize"));
                 discSizeCombo->setItemText(0, tr("Off"));
+                guardSpin->setSuffix(tr(" MB"));
+                // The tooltips need re-setting too, exactly as the BDMV -> ISO tab hook does.
+                // Without this they keep the language the window was built in.
+                const QString fitTip = wrapTip(tr(
+                    "Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick "
+                    "the disc you intend to burn and tsMuxeR checks the finished size against that capacity "
+                    "and warns if it does not fit."));
+                fitLabel->setToolTip(fitTip);
+                discSizeCombo->setToolTip(fitTip);
+                guardCheck->setToolTip(wrapTip(tr(
+                    "On a multi-layer disc the drive switches layers at a fixed point, and those sectors are "
+                    "the ones most likely to burn badly. Switch this on to fill them with zeros so no part of "
+                    "the movie sits there and playback runs smoothly across the break. Applies to ISO "
+                    "output.")));
+                guardSpin->setToolTip(wrapTip(tr(
+                    "How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values "
+                    "are safer but take that space away from the movie.")));
+                oversizeCheck->setToolTip(wrapTip(tr(
+                    "Mux even when the result does not fit the disc size chosen above. Useful when you burn "
+                    "to a larger disc than selected or write the image to disk only. The image will not fit "
+                    "the selected disc.")));
             });
     }
 
@@ -2637,7 +2692,9 @@ QString TsMuxerWindow::getMuxOpts()
             rez += " --disc-size=" + discSizeCombo->currentText().toLower();
         auto* guardCheck = findChild<QCheckBox*>("dlGuardCheck");
         auto* guardSpin = findChild<QSpinBox*>("dlGuardSpin");
-        if (guardCheck && guardSpin && guardCheck->isChecked())
+        // ISO only: the guard pads the disc image. Emitting it for a Blu-ray folder would put an
+        // option in the meta that the muxer ignores.
+        if (guardCheck && guardSpin && guardCheck->isChecked() && ui->radioButtonBluRayISO->isChecked())
             rez += " --layer-break-guard=" + QString::number(guardSpin->value());
         auto* oversizeCheck = findChild<QCheckBox*>("dlAllowOversize");
         if (oversizeCheck && oversizeCheck->isChecked())
@@ -2930,6 +2987,23 @@ void TsMuxerWindow::updateMuxTime2()
     ui->muxTimeEdit->setTime(qTimeFromFloat(timeF));
     ui->muxTimeEdit->blockSignals(false);
     updateMetaLines();
+}
+
+void TsMuxerWindow::snapMuxTimeToBdMinimum()
+{
+    // Below 524280 ticks of the 45 kHz clock (11.65 s) Blu-ray navigation breaks:
+    // players subtract the decoder preroll near zero and their 32-bit 45 kHz
+    // registers underflow. The muxer raises such values too; mirror it here so the
+    // field never rests in the broken range. 0 keeps the default (600 s).
+    constexpr int MIN_BD_START_TICKS = 524280;
+    // Only for outputs the muxer itself gates. It exempts plain TS and demux mode, so snapping
+    // there would make the GUI stricter than the CLI for the same request, silently and with no
+    // way to opt out.
+    if (ui->radioButtonTS->isChecked() || ui->radioButtonDemux->isChecked())
+        return;
+    const int v = ui->muxTimeClock->value();
+    if (v > 0 && v < MIN_BD_START_TICKS)
+        ui->muxTimeClock->setValue(MIN_BD_START_TICKS);  // valueChanged re-syncs the time edit
 }
 
 void TsMuxerWindow::onLanguageComboBoxIndexChanged(int idx)

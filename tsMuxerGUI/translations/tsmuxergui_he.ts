@@ -3898,6 +3898,26 @@ Build the ISO anyway?</source>
         <source>Covers the typical ~35 MB defect, but larger bad zones are common on real media, and on a defect-managed disc the true layer switch can sit up to 128 MB after the calculated break. 288 MB recommended.</source>
         <translation>מכסה את הפגם הטיפוסי של ~35 MB, אך אזורים פגומים גדולים יותר נפוצים במדיה אמיתית, ובדיסק עם ניהול פגמים מעבר השכבה בפועל עשוי להימצא עד 128 MB אחרי נקודת המעבר המחושבת. מומלץ 288 MB.</translation>
     </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1357"/>
+        <source>Target disc size for the muxed output. Leave it Off to mux without a size limit. Pick the disc you intend to burn and tsMuxeR checks the finished size against that capacity and warns if it does not fit.</source>
+        <translation>גודל הדיסק המבוקש לפלט. השאר על Off כדי למזג ללא הגבלת גודל. בחר את הדיסק שבכוונתך לצרוב, ו-tsMuxeR יבדוק את הגודל הסופי מול הקיבולת הזו ויזהיר אם הוא לא נכנס.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1363"/>
+        <source>On a multi-layer disc the drive switches layers at a fixed point, and those sectors are the ones most likely to burn badly. Switch this on to fill them with zeros so no part of the movie sits there and playback runs smoothly across the break. Applies to ISO output.</source>
+        <translation>בדיסק רב-שכבתי הכונן מחליף שכבה בנקודה קבועה, והסקטורים האלה הם הנוטים ביותר להיצרב בצורה לקויה. הפעלה תמלא אותם באפסים כך שאף חלק מהסרט לא יישב שם והנגינה תעבור את המעבר בין השכבות בצורה חלקה. חל על פלט ISO.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1367"/>
+        <source>How much to fill at the layer break. 288 MB covers the usual defect zone. Larger values are safer but take that space away from the movie.</source>
+        <translation>כמה למלא בנקודת המעבר בין השכבות. 288 MB מכסים את אזור הפגמים הרגיל. ערכים גדולים יותר בטוחים יותר אך גוזלים את המקום הזה מהסרט.</translation>
+    </message>
+    <message>
+        <location filename="../tsmuxerwindow.cpp" line="1370"/>
+        <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
+        <translation>מזג גם אם התוצאה לא נכנסת לגודל הדיסק שנבחר למעלה. שימושי כשצורבים לדיסק גדול יותר מזה שנבחר, או כשכותבים את הקובץ לדיסק הקשיח בלבד. הקובץ לא ייכנס לדיסק שנבחר.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

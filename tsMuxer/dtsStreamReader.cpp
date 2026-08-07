@@ -640,7 +640,12 @@ int DTSStreamReader::decodeFrame(uint8_t* buff, uint8_t* end, int& skipBytes, in
             return NOT_ENOUGH_BUFFER;
 
         const uint8_t* nextFrame = afterFrameData + hdFrameSize;
-        if (nextFrame >= end)
+        // nextFrame == end means the extension substream ends exactly on the buffer end, so it
+        // is complete and can be processed now. Treating that as NOT_ENOUGH_BUFFER stalls the
+        // last frame of the stream: no more data ever arrives, and flushPacket then emits the
+        // whole remaining buffer verbatim, which puts one extension block into a
+        // down-to-dts output that is supposed to carry the core only.
+        if (nextFrame > end)
             return NOT_ENOUGH_BUFFER;
         if (m_downconvertToDTS)
         {

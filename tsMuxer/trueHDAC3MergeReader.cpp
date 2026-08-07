@@ -43,29 +43,31 @@ void TrueHDAC3MergeReader::setAc3SideData(const uint8_t* data, const uint32_t le
 
 void TrueHDAC3MergeReader::extractAc3FramesFromAccum()
 {
-    while (!m_ac3Accum.empty())
+    // Parse with a read cursor and compact the accumulator ONCE at the end. The
+    // previous version erased the vector front per AC-3 frame, which memmoves the
+    // whole remaining accumulator (a 2 MB read block) for every ~2 KB frame:
+    // O(chunk^2 / frameLen), hundreds of GB of memmove over a movie-length track.
+    size_t pos = 0;
+    while (pos < m_ac3Accum.size())
     {
-        uint8_t* start = m_ac3Accum.data();
-        uint8_t* end = start + m_ac3Accum.size();
+        uint8_t* start = m_ac3Accum.data() + pos;
+        uint8_t* end = m_ac3Accum.data() + m_ac3Accum.size();
         uint8_t* frame = m_ac3Parser.findAc3Sync(start, end);
         if (frame == nullptr)
         {
-            if (m_ac3Accum.size() > 65536)
-                m_ac3Accum.erase(m_ac3Accum.begin(), m_ac3Accum.begin() + (m_ac3Accum.size() - 4096));
-            return;
+            // no sync in the rest: keep at most the last 4096 bytes of it
+            if (m_ac3Accum.size() - pos > 65536)
+                pos = m_ac3Accum.size() - 4096;
+            break;
         }
-        if (frame > start)
-        {
-            m_ac3Accum.erase(m_ac3Accum.begin(), m_ac3Accum.begin() + (frame - start));
-            continue;
-        }
+        pos += frame - start;  // drop garbage before the sync
         int skipBytes = 0;
         const int flen = m_ac3Parser.parse(frame, end, skipBytes);
         if (flen == NOT_ENOUGH_BUFFER)
-            return;
+            break;  // partial frame stays at the front for the next call
         if (flen <= 0)
         {
-            m_ac3Accum.erase(m_ac3Accum.begin());
+            pos++;  // bad frame: resync from the next byte
             continue;
         }
         if (m_ac3Parser.isEAC3())
@@ -82,8 +84,10 @@ void TrueHDAC3MergeReader::extractAc3FramesFromAccum()
         if (m_ac3SamplesPerSyncFrame == 0 && q.samples > 0)
             m_ac3SamplesPerSyncFrame = q.samples;
         m_ac3FrameQueue.push_back(std::move(q));
-        m_ac3Accum.erase(m_ac3Accum.begin(), m_ac3Accum.begin() + total);
+        pos += total;
     }
+    if (pos > 0)
+        m_ac3Accum.erase(m_ac3Accum.begin(), m_ac3Accum.begin() + pos);
 }
 
 void TrueHDAC3MergeReader::fillDelayedFromQueue()
@@ -147,9 +151,23 @@ int TrueHDAC3MergeReader::readPacket(AVPacket& avPacket)
             return 0;
         }
 
-        // Priority 3: Need more AC3 data if waiting and don't have any
+        // Priority 3: Need more AC3 data if waiting and don't have any.
+        // Carry the unconsumed TrueHD tail over, exactly as SimplePacketizerReader::readPacket
+        // does before every NEED_MORE_DATA. Without this, setBuffer refills the staging buffer
+        // from offset 0 and whatever was still sitting between m_curPos and m_bufEnd is gone.
+        // It only bites when the AC-3 source has no sync word in its first block (a wrong or
+        // empty merge-ac3-file), but then it silently drops a whole 2 MiB of audio and still
+        // reports "Mux successful complete".
         if (m_thdDemuxWaitAc3 && m_ac3FrameQueue.empty())
+        {
+            if (m_curPos < m_bufEnd)
+            {
+                m_tmpBufferLen = static_cast<uint32_t>(m_bufEnd - m_curPos);
+                memmove(m_tmpBuffer.data(), m_curPos, m_tmpBufferLen);
+                m_curPos = m_bufEnd;
+            }
             return AbstractStreamReader::NEED_MORE_DATA;
+        }
 
         // Priority 4: Pre-fill delayed buffer for next AC3 emission when not waiting
         if (!m_thdDemuxWaitAc3 && m_delayedAc3Buffer.isEmpty() && !m_ac3FrameQueue.empty())
@@ -160,7 +178,8 @@ int TrueHDAC3MergeReader::readPacket(AVPacket& avPacket)
         if (rez != 0)
             return rez;
 
-        avPacket.dts = avPacket.pts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
+        if (m_samplerate)
+            avPacket.dts = avPacket.pts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
 
         m_totalTHDSamples += m_samples;
         m_demuxedTHDSamplesForAc3 += m_samples;
@@ -181,7 +200,8 @@ int TrueHDAC3MergeReader::flushPacket(AVPacket& avPacket)
     if (rez > 0)
     {
         if (!(avPacket.flags & AVPacket::PRIORITY_DATA))
-            avPacket.pts = avPacket.dts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
+            if (m_samplerate)
+                avPacket.pts = avPacket.dts = m_totalTHDSamples * INTERNAL_PTS_FREQ / m_samplerate;
     }
     return rez;
 }
