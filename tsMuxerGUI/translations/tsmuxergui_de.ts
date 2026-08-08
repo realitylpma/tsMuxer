@@ -3918,6 +3918,38 @@ ISO trotzdem erstellen?</translation>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>Auch dann muxen, wenn das Ergebnis nicht auf die oben gewählte Datenträgergröße passt. Nützlich, wenn du auf einen größeren Datenträger brennst als ausgewählt oder das Abbild nur auf die Festplatte schreibst. Das Abbild passt dann nicht auf den gewählten Datenträger.</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>Spur %1: %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>Einige Spuren wurden übersprungen</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>Diese Spuren können nicht gemuxt werden und wurden nicht hinzugefügt:</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>Nichts zu muxen</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>Diese Datei enthält keine Spuren, die gemuxt werden können:</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics, das Menü-Overlay der Disc</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>Textuntertitel (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1 (Streamtyp 0x%2). Das Muxen dieses Streamtyps ist nicht implementiert.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

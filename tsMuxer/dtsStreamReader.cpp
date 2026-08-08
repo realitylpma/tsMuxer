@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "pgsStreamReader.h"
+#include "vodCoreException.h"
 
 // static constexpr int DCA_EXT_CORE = 0x001;       ///< core in core substream
 static constexpr int DCA_EXT_XXCH = 0x002;  ///< XXCh channels extension in core substream
@@ -649,6 +650,19 @@ int DTSStreamReader::decodeFrame(uint8_t* buff, uint8_t* end, int& skipBytes, in
             return NOT_ENOUGH_BUFFER;
         if (m_downconvertToDTS)
         {
+            // Extracting the core means dropping the extension substreams and keeping the core
+            // frames interleaved with them. A DTS Express (LBR) track, and any other
+            // extension-only stream, has no core substream at all, so this drops EVERY frame:
+            // skipBytes swallows the whole extension and i_frame_size stays 0, which used to
+            // produce a 0 byte file while still reporting "Mux successful complete". Mixed with
+            // other tracks it was worse, leaving a PMT entry with no packets behind it.
+            // m_isCoreExists is settled by checkIfOnlyHDDataExists() before any decodeFrame call,
+            // so it is already known here. m_testMode excludes the detection pass, which must
+            // stay non-fatal.
+            if (!m_isCoreExists && !m_testMode)
+                THROW(ERR_INVALID_CODEC_FORMAT,
+                      "down-to-dts: this DTS track has no DTS core to extract, so there is nothing "
+                      "to keep. Mux it without down-to-dts to pass the track through unchanged.")
             skipBytes = static_cast<int>(nextFrame - buff - i_frame_size);
             return i_frame_size;
         }

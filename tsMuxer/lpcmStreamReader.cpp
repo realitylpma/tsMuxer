@@ -286,7 +286,13 @@ int LPCMStreamReader::convertWavToPCM(uint8_t* start, uint8_t* end)
             sampling_index = 5;
         m_tmpFrameBuffer[2] = (channelsIndex << 4 | sampling_index) & 0xff;
         const int bits_per_sample = (m_bitsPerSample - 12) / 4;
-        m_tmpFrameBuffer[3] = (bits_per_sample << 6 | m_firstFrame << 5) & 0xff;
+        // Bit 5 of this byte was set on the first frame of every output file (m_firstFrame is
+        // re-armed by onSplitEvent). No pressed disc does that: across two retail sources from
+        // different studios, bit 5 is clear on ALL 10,014 frames of a 24-bit 5.1 track and all
+        // 18,018 frames of a 16-bit 2.0 one. Setting it was the single byte that stopped a
+        // remuxed LPCM track from being bit-identical to its source. m_firstFrame is still
+        // needed in demux mode, where it triggers the WAV header, so only this use is dropped.
+        m_tmpFrameBuffer[3] = (bits_per_sample << 6) & 0xff;
     }
     return static_cast<int>(dst - m_tmpFrameBuffer);
 }

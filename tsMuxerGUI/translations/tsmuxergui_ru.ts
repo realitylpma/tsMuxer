@@ -3919,6 +3919,38 @@ Build the ISO anyway?</source>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>Мультиплексировать, даже если результат не помещается в выбранный выше размер диска. Полезно, если вы записываете на диск большего размера или пишете образ только на жёсткий диск. Образ не поместится на выбранный диск.</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>Дорожка %1: %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>Некоторые дорожки пропущены</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>Эти дорожки нельзя мультиплексировать, они не добавлены:</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>Нечего мультиплексировать</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>В этом файле нет дорожек, которые можно мультиплексировать:</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics, менюшный слой диска</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>Текстовые субтитры (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1 (тип потока 0x%2). Мультиплексирование этого типа не реализовано.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

@@ -124,6 +124,16 @@ double timeToFloat(const std::string& chapterStr);
 std::string toNativeSeparators(const std::string& dirName);
 double correctFps(double fps);
 
+// Audio delay carried in a file name, using the convention eac3to established:
+// "<name> DELAY -17ms.<ext>". A raw elementary stream has nowhere else to keep the offset a
+// track had against the video in its container.
+// parseTimeshiftToMs accepts the same forms as the meta timeshift parameter (ms, s, ns).
+// delayFromFileName returns 0 when there is no token; it matches the LAST one so that a
+// stale token earlier in the name cannot win over the current one.
+int64_t parseTimeshiftToMs(const std::string& value);
+int64_t delayFromFileName(const std::string& fileName);
+std::string stripDelayToken(const std::string& fileName);
+
 static int64_t internalClockToPts(const int64_t value) { return value / INT_FREQ_TO_TS_FREQ; }
 static int64_t ptsToInternalClock(const int64_t value) { return value * INT_FREQ_TO_TS_FREQ; }
 

@@ -150,3 +150,78 @@ double correctFps(const double fps)
     }
     return fps;
 }
+
+// ---------------------------------------------------------------------------------------
+// Audio delay carried in a file name ("<name> DELAY -17ms.<ext>", the eac3to convention).
+//
+// Only "ms" is emitted, because that is what eac3to writes and what other tools expect, but
+// the parser accepts the same suffixes the meta timeshift parameter does so that a value
+// copied from a meta file behaves the same way in a name.
+// ---------------------------------------------------------------------------------------
+
+static const char DELAY_TOKEN[] = " DELAY ";
+
+int64_t parseTimeshiftToMs(const std::string& value)
+{
+    // Order matters: "ns" contains "s", so it must be tested before the bare "s" case, and
+    // "ms" likewise. Mirrors the parsing order used for the timeshift meta parameter.
+    size_t pos;
+    if ((pos = value.find("ns")) != std::string::npos)
+        return strToInt64(value.substr(0, pos).c_str()) / 1000000;
+    if ((pos = value.find("ms")) != std::string::npos)
+        return strToInt64(value.substr(0, pos).c_str());
+    if ((pos = value.find('s')) != std::string::npos)
+        return strToInt64(value.substr(0, pos).c_str()) * 1000;
+    return strToInt64(value.c_str());
+}
+
+// Locate the last " DELAY <n>ms" that sits immediately before the extension. Returns the
+// offset of the token, or npos. strict form only: optional sign, digits, then "ms".
+static size_t findDelayToken(const std::string& name, int64_t* valueOut)
+{
+    size_t best = std::string::npos;
+    size_t from = 0;
+    while (true)
+    {
+        const size_t at = name.find(DELAY_TOKEN, from);
+        if (at == std::string::npos)
+            break;
+        size_t p = at + sizeof(DELAY_TOKEN) - 1;
+        const size_t numStart = p;
+        if (p < name.size() && (name[p] == '-' || name[p] == '+'))
+            p++;
+        const size_t digitsStart = p;
+        while (p < name.size() && name[p] >= '0' && name[p] <= '9') p++;
+        if (p > digitsStart && p + 1 < name.size() + 1 && name.compare(p, 2, "ms") == 0)
+        {
+            // Accept only when "ms" ends the name, or is followed by an extension. This
+            // keeps a directory called "DELAY 5ms" in the middle of a path from matching.
+            const size_t after = p + 2;
+            if (after == name.size() || name[after] == '.')
+            {
+                best = at;
+                if (valueOut)
+                    *valueOut = strToInt64(name.substr(numStart, p - numStart).c_str());
+            }
+        }
+        from = at + 1;
+    }
+    return best;
+}
+
+int64_t delayFromFileName(const std::string& fileName)
+{
+    std::string name = extractFileName(fileName);
+    int64_t value = 0;
+    if (findDelayToken(name, &value) == std::string::npos)
+        return 0;
+    return value;
+}
+
+std::string stripDelayToken(const std::string& fileName)
+{
+    const size_t at = findDelayToken(fileName, nullptr);
+    if (at == std::string::npos)
+        return fileName;
+    return fileName.substr(0, at);
+}

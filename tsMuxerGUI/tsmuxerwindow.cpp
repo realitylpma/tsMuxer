@@ -1456,6 +1456,11 @@ void TsMuxerWindow::onTsMuxerCodecInfoReceived()
     int lastTrackID = 0;
     QString tmpStr;
     bool firstMark = true;
+    // Tracks tsMuxeR recognised but cannot mux, e.g. the Interactive Graphics menu overlay.
+    // They are deliberately reported without the "Stream type: " prefix so they are never
+    // offered as selectable, which previously meant they vanished from the GUI with no
+    // explanation at all. Collect them and say so once, naming the stream.
+    QStringList unsupportedTracks;
     codecList.clear();
     mplsFileList.clear();
     chapters.clear();
@@ -1527,7 +1532,64 @@ void TsMuxerWindow::onTsMuxerCodecInfoReceived()
             codecInfo->enabledByDefault = false;
         }
 
-        if (procStdOutput[i].startsWith("Error: "))
+        if (procStdOutput[i].startsWith("Not supported: "))
+        {
+            // The CLI sentence is English only, so relaying it verbatim produced a
+            // half-translated dialog: a localised "Track 5120:" followed by an English
+            // description. Recover the stream type code from it instead and build the whole
+            // line here, where it can be translated. Unknown types fall back to the original
+            // text, which is still better than nothing.
+            const QString what = QtCompat::strMid(procStdOutput[i], QString("Not supported: ").length());
+            int streamType = -1;
+            const int typeAt = what.indexOf("(stream type 0x");
+            if (typeAt >= 0)
+            {
+                const int from = typeAt + QString("(stream type 0x").length();
+                const int to = what.indexOf(')', from);
+                if (to > from)
+                    streamType = QtCompat::strMid(what, from, to - from).toInt(nullptr, 16);
+            }
+            QString description;
+            switch (streamType)
+            {
+            case 0x91:
+                description = tr("Interactive Graphics, the disc menu overlay");
+                break;
+            case 0x92:
+                description = tr("Text subtitles (Text-ST)");
+                break;
+            default:
+                break;
+            }
+            if (description.isEmpty())
+                description = what;  // unknown type: keep whatever the CLI said
+            else
+                description = tr("%1 (stream type 0x%2). Muxing this stream type is not implemented.")
+                                  .arg(description)
+                                  .arg(streamType, 0, 16);
+
+            if (lastTrackID > 0)
+            {
+                unsupportedTracks << tr("Track %1: %2").arg(lastTrackID).arg(description);
+                // The preceding "Track ID:" line already pushed an entry, and no
+                // "Stream type:" will ever arrive to fill it. Left in place it becomes a
+                // blank row in the track list, and it also makes codecList non-empty, which
+                // suppressed the "Can't detect stream type" warning for a file that really
+                // does contain nothing muxable.
+                if (!codecList.isEmpty() && codecList.back().trackID == lastTrackID &&
+                    codecList.back().displayName.isEmpty())
+                {
+                    codecList.removeLast();
+                    codecInfo = nullptr;
+                }
+                lastTrackID = 0;
+            }
+            else
+            {
+                unsupportedTracks << description;
+            }
+        }
+        else if (procStdOutput[i].startsWith("Error: "))
         {
             tmpStr = QtCompat::strMid(procStdOutput[i], QString("Error: ").length());
             QMessageBox msgBox(this);
@@ -1600,12 +1662,38 @@ void TsMuxerWindow::onTsMuxerCodecInfoReceived()
     if (codecList.isEmpty())
     {
         QMessageBox msgBox(this);
-        msgBox.setWindowTitle(tr("Unsupported format"));
-        msgBox.setText(tr("Can't detect stream type. File name: \"%1\"").arg(newFileName));
+        if (unsupportedTracks.isEmpty())
+        {
+            msgBox.setWindowTitle(tr("Unsupported format"));
+            msgBox.setText(tr("Can't detect stream type. File name: \"%1\"").arg(newFileName));
+        }
+        else
+        {
+            // Every track in the file is one we recognise but cannot mux, e.g. a clip that
+            // holds nothing but the menu overlay. Saying "can't detect stream type" here
+            // would be both wrong and unhelpful: the type was detected, it just cannot be
+            // muxed. Name it instead.
+            msgBox.setWindowTitle(tr("Nothing to mux"));
+            msgBox.setText(tr("This file contains no tracks that can be muxed:"));
+            msgBox.setInformativeText(unsupportedTracks.join('\n'));
+        }
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setStandardButtons(QMessageBox::Ok);
         msgBox.exec();
         return;
+    }
+    if (!unsupportedTracks.isEmpty())
+    {
+        // One informational box for the whole file rather than one per track: a disc can
+        // carry dozens of menu overlays, and this is information, not a failure. The usable
+        // tracks were all added normally.
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("Some tracks were skipped"));
+        msgBox.setText(tr("These tracks cannot be muxed and were not added:"));
+        msgBox.setInformativeText(unsupportedTracks.join('\n'));
+        msgBox.setIcon(QMessageBox::Information);
+        msgBox.setStandardButtons(QMessageBox::Ok);
+        msgBox.exec();
     }
     updateMetaLines();
     emit codecListReady();

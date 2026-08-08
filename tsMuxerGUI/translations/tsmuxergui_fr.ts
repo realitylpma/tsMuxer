@@ -3918,6 +3918,38 @@ Créer l'ISO malgré tout ?</translation>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>Multiplexer même si le résultat ne tient pas dans la taille de disque choisie ci-dessus. Utile si vous gravez sur un disque plus grand que celui sélectionné ou si vous écrivez l'image seulement sur le disque dur. L'image ne tiendra pas sur le disque sélectionné.</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>Piste %1 : %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>Certaines pistes ont été ignorées</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>Ces pistes ne peuvent pas être multiplexées et n'ont pas été ajoutées :</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>Rien à multiplexer</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>Ce fichier ne contient aucune piste multiplexable :</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics, la surcouche de menu du disque</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>Sous-titres texte (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1 (type de flux 0x%2). Le multiplexage de ce type de flux n'est pas implémenté.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

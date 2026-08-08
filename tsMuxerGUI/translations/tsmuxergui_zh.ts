@@ -3918,6 +3918,38 @@ Build the ISO anyway?</source>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>即使结果放不下上面选择的光盘容量也进行混流。当你刻录到比所选更大的光盘，或只把镜像写到硬盘时很有用。镜像将无法放入所选光盘。</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>轨道 %1：%2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>部分轨道已跳过</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>这些轨道无法混流，因此未被添加：</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>无可混流的内容</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>此文件不包含可混流的轨道：</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics（光盘菜单叠层）</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>文本字幕 (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1（流类型 0x%2）。尚未实现此流类型的混流。</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

@@ -770,8 +770,14 @@ int HevcHdrUnit::deserialize()
                 HDR10_metadata[1] = m_reader.getBits(32);  // display_primaries Red
                 HDR10_metadata[2] = m_reader.getBits(32);  // display_primaries Blue
                 HDR10_metadata[3] = m_reader.getBits(32);  // White Point
-                HDR10_metadata[4] = ((m_reader.getBits(32) / 10000) << 16) +
-                                    m_reader.getBits(32);  // max & min display_mastering_luminance
+                // These two reads MUST stay in separate statements. As operands of '+' the two
+                // getBits(32) calls are only indeterminately sequenced, so the compiler may read
+                // them in either order. MSVC x64 evaluates the right operand first, which fed max
+                // in as min and min in as max: a 4000 nit master was written as 610 nits.
+                // H.265 SEI 137 sends max_display_mastering_luminance first, then min.
+                const unsigned maxDisplayMasteringLuminance = m_reader.getBits(32);
+                const unsigned minDisplayMasteringLuminance = m_reader.getBits(32);
+                HDR10_metadata[4] = ((maxDisplayMasteringLuminance / 10000) << 16) + minDisplayMasteringLuminance;
             }
             else if (payloadType == 144)  // content_light_level_info
             {

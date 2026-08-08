@@ -3914,6 +3914,38 @@ Build the ISO anyway?</source>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

@@ -630,7 +630,15 @@ int SPSUnit::deserializeVuiParameters()
             return 1;
         if (extractUEGolombCode() > 16)  // log2_max_mv_length_vertical
             return 1;
-        if (extractUEGolombCode() > extractUEGolombCode())  // num_reorder_frames > max_dec_frame_buffering
+        // Read both fields into named variables first. As operands of '>' these two calls are only
+        // indeterminately sequenced, and '>' is not commutative, so a compiler that evaluates the
+        // right operand first would compare max_dec_frame_buffering > num_reorder_frames instead.
+        // That is true for most real streams (e.g. 4 > 2), which would make this return 1 and cause
+        // the whole H.264 track to be dropped. MSVC happens to read left first; GCC and Clang, which
+        // build the Linux and macOS releases, commonly do not.
+        const unsigned num_reorder_frames = extractUEGolombCode();
+        const unsigned max_dec_frame_buffering = extractUEGolombCode();
+        if (num_reorder_frames > max_dec_frame_buffering)
             return 1;
     }
     return 0;

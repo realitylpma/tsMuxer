@@ -3919,6 +3919,38 @@ Mantener la imagen en torno a 66 GB (las dos primeras capas) mejora las probabil
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>Multiplexar aunque el resultado no quepa en el tamaño de disco elegido arriba. Útil si grabas en un disco mayor que el seleccionado o si solo escribes la imagen en el disco duro. La imagen no cabrá en el disco seleccionado.</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>Pista %1: %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>Se omitieron algunas pistas</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>Estas pistas no se pueden multiplexar y no se han añadido:</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>Nada que multiplexar</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>Este archivo no contiene pistas que se puedan multiplexar:</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics, la superposición de menú del disco</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>Subtítulos de texto (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1 (tipo de flujo 0x%2). La multiplexación de este tipo no está implementada.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

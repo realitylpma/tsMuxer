@@ -168,6 +168,26 @@ void SingleFileMuxer::intAddStream(const std::string& streamName, const std::str
         fileName += itr->second;
     }
 
+    // A raw elementary stream cannot carry a timestamp, so a track that was offset against
+    // the video in its container comes out of a demux with that offset lost, and muxing it
+    // back puts it at zero. Record the offset in the file name using the convention eac3to
+    // established, e.g. "00294.track_4353 DELAY -17ms.ac3", so the round trip stays in sync
+    // and other tools that already speak this convention can read it.
+    // Any stale token in the source name is stripped first, or a file that has been through
+    // the loop once accumulates one token per generation.
+    itr = params.find("timeshift");
+    if (itr != params.end())
+    {
+        const int64_t delayMs = parseTimeshiftToMs(itr->second);
+        if (delayMs != 0)
+        {
+            fileName = stripDelayToken(fileName);
+            fileName += " DELAY ";
+            fileName += int32ToStr(static_cast<int32_t>(delayMs));
+            fileName += "ms";
+        }
+    }
+
     auto streamInfo = new StreamInfo(static_cast<unsigned>(DEFAULT_FILE_BLOCK_SIZE));
     streamInfo->m_fileName = fileName + fileExt;
     if (streamInfo->m_fileName.size() > 254)

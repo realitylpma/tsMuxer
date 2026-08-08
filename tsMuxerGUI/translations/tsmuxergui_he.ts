@@ -3918,6 +3918,38 @@ Build the ISO anyway?</source>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>מזג גם אם התוצאה לא נכנסת לגודל הדיסק שנבחר למעלה. שימושי כשצורבים לדיסק גדול יותר מזה שנבחר, או כשכותבים את הקובץ לדיסק הקשיח בלבד. הקובץ לא ייכנס לדיסק שנבחר.</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>רצועה %1: %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>חלק מהרצועות דולגו</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>לא ניתן למזג את הרצועות האלה ולכן הן לא נוספו:</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>אין מה למזג</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>קובץ זה אינו מכיל רצועות שניתן למזג:</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics, שכבת התפריט של הדיסק</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>כתוביות טקסט (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1 (סוג מקטע 0x%2). מיזוג של סוג מקטע זה אינו ממומש.</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>

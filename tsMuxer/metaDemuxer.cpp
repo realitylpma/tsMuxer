@@ -584,6 +584,21 @@ int METADemuxer::addStream(const string& codec, const string& codecStreamName, c
         if (value > 0)
             streamInfo.m_lastDTS = value;
     }
+    else if (!fileList.empty())
+    {
+        // No explicit timeshift, so fall back to a delay recorded in the file name by a
+        // previous demux (or by eac3to, which uses the same convention). An explicit
+        // timeshift always wins, because this is the else branch of the test above.
+        const int64_t delayMs = delayFromFileName(fileList[0]);
+        if (delayMs != 0)
+        {
+            const int64_t value = delayMs * INTERNAL_PTS_FREQ / 1000;
+            streamInfo.m_timeShift = value;
+            if (value > 0)
+                streamInfo.m_lastDTS = value;
+            LTRACE(LT_INFO, 2, "Applying delay " << delayMs << " ms taken from the file name");
+        }
+    }
 
     itr = addParams.find("lang");
     if (itr != addParams.end())
@@ -1350,6 +1365,26 @@ AbstractStreamReader* METADemuxer::createCodec(const string& codecName, const ma
         rez = new LPCMStreamReader();
     else if (codecName == "A_MLP")
     {
+        // down-to-ac3 keeps the AC-3 frames interleaved with the HD ones and drops the HD part; it
+        // does not convert anything, and tsMuxeR has no audio encoder. A_MLP is a standalone
+        // TrueHD stream, so by construction there is no core to keep. The option used to be
+        // accepted here and silently ignored, which is the actual defect.
+        // Warn rather than fail. Unlike the DTS Express case, where dropping the extension
+        // leaves literally nothing and there is no valid output to produce, here ignoring the
+        // option still yields a correct TrueHD track: exactly what the user already had,
+        // because the option has always been a no-op on this codec. Failing would break
+        // existing meta files for no gain. The defect was that it was ignored SILENTLY.
+        if (addParams.find("down-to-ac3") != addParams.end())
+            LTRACE(LT_WARN, 2,
+                   "Warning: down-to-ac3 has no effect on an A_MLP track and is being ignored. "
+                   "A standalone TrueHD stream has no AC-3 core to keep, and tsMuxeR does not "
+                   "encode audio. If this stream came from a Blu-ray it may already carry an "
+                   "interleaved core: run tsMuxeR on the file, and if it reports "
+                   "\"A_AC3 / AC3 core + TRUE-HD\" then change this line's codec to A_AC3 and "
+                   "down-to-ac3 will work. Otherwise encode a companion track externally "
+                   "(ffmpeg -i in -c:a ac3 -b:a 640k -ac 6 compat.ac3) and either mux compat.ac3 "
+                   "on its own line, or pass merge-ac3-file=\"compat.ac3\" here to keep the "
+                   "TrueHD track with a compatible core alongside it.");
         if (addParams.find("merge-ac3-track") != addParams.end() || addParams.find("merge-ac3-file") != addParams.end())
             rez = new TrueHDAC3MergeReader(addParams);
         else

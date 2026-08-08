@@ -3918,6 +3918,38 @@ Build the ISO anyway?</source>
         <source>Mux even when the result does not fit the disc size chosen above. Useful when you burn to a larger disc than selected or write the image to disk only. The image will not fit the selected disc.</source>
         <translation>上で選んだディスクサイズに収まらない場合でも多重化します。選択したものより大きなディスクに書き込む場合や、イメージをハードディスクに書き出すだけの場合に便利です。イメージは選択したディスクには収まりません。</translation>
     </message>
+    <message>
+        <source>Track %1: %2</source>
+        <translation>トラック %1: %2</translation>
+    </message>
+    <message>
+        <source>Some tracks were skipped</source>
+        <translation>一部のトラックをスキップしました</translation>
+    </message>
+    <message>
+        <source>These tracks cannot be muxed and were not added:</source>
+        <translation>これらのトラックは多重化できないため、追加されませんでした：</translation>
+    </message>
+    <message>
+        <source>Nothing to mux</source>
+        <translation>多重化できるものがありません</translation>
+    </message>
+    <message>
+        <source>This file contains no tracks that can be muxed:</source>
+        <translation>このファイルには多重化できるトラックがありません：</translation>
+    </message>
+    <message>
+        <source>Interactive Graphics, the disc menu overlay</source>
+        <translation>Interactive Graphics（ディスクのメニューオーバーレイ）</translation>
+    </message>
+    <message>
+        <source>Text subtitles (Text-ST)</source>
+        <translation>テキスト字幕 (Text-ST)</translation>
+    </message>
+    <message>
+        <source>%1 (stream type 0x%2). Muxing this stream type is not implemented.</source>
+        <translation>%1（ストリームタイプ 0x%2）。このストリームタイプの多重化は実装されていません。</translation>
+    </message>
 </context>
 <context>
     <name>muxForm</name>
