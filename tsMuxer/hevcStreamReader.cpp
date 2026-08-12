@@ -1,6 +1,8 @@
 #include "hevcStreamReader.h"
 
 #include <fs/systemlog.h>
+
+#include <cmath>
 #include <memory>
 
 #include "bitStream.h"
