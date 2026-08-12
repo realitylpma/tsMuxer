@@ -30,6 +30,11 @@ struct StreamDiscoveryData
     double fps = 0.0;
     bool interlaced = false;
     int hdrType = 0;  // maps to getStreamHDR() return values
+    // Dolby Vision layer flags. Carried here because they are discovered while probing and are
+    // NOT re-derived during muxing: the RPU sits at the end of an access unit, so by the time a
+    // muxer writes its header the reader has not necessarily seen one yet.
+    bool isDVRPU = false;
+    bool isDVEL = false;
     int profile = 0;
     int level = 0;
 

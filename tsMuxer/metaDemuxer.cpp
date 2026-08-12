@@ -7,6 +7,9 @@
 #include <types/types.h>
 #include <climits>
 #include <memory>
+#include <set>
+
+static bool isKnownTrackParam(const std::string& name);
 
 #include "aacStreamReader.h"
 #include "ac3StreamReader.h"
@@ -197,7 +200,16 @@ void METADemuxer::openFile(const string& streamName)
         {
             // params[i] = strToLowerCase ( params[i] );
             vector<string> tmp = splitStr(params[i].c_str(), '=');
-            addParams[trimStr(tmp[0])] = trimStr(tmp.size() > 1 ? tmp[1] : "");
+            const string paramName = trimStr(tmp[0]);
+            addParams[paramName] = trimStr(tmp.size() > 1 ? tmp[1] : "");
+            if (!isKnownTrackParam(paramName))
+            {
+                // A misspelled parameter used to be accepted in silence and simply do nothing,
+                // so "langauge=deu" looked like it had worked. Warn rather than fail: a meta
+                // written for a newer build must keep working on an older one, and refusing
+                // would break that.
+                LTRACE(LT_WARN, 2, "Warning: unknown track parameter \"" << paramName << "\" ignored.");
+            }
         }
         string codec = trimStr(params[0]);
         string codecStreamName = trimStr(params[1]);
@@ -603,6 +615,35 @@ int METADemuxer::addStream(const string& codec, const string& codecStreamName, c
     itr = addParams.find("lang");
     if (itr != addParams.end())
         streamInfo.m_lang = itr->second;
+    else if (dataReader == &m_containerReader)
+    {
+        // No explicit lang=, so ask the container, exactly as the FPS block above asks it for a
+        // frame rate. A track that was tagged "deu" in its source used to come out untagged: the
+        // language was parsed and printed but never reached a muxer, and StreamInfo::m_lang has
+        // been sitting here unread ever since somebody started this and stopped.
+        //
+        // Deliberately NOT written into addParams["lang"]: SingleFileMuxer builds demuxed file
+        // names from that key, so filling it would silently rename every file a --demux produces.
+        // muxerManager passes this field on under its own key instead.
+        //
+        // ONLY for a single file, and that restriction is load bearing. getTrackList CONSUMES the
+        // buffered reader, reading until it has every PMT. With one file that costs nothing, the
+        // muxing read is a separate pass and the produced bytes are provably unchanged. With a
+        // JOINED track, "a"+"b", the files share one FileListIterator, so consuming the reader
+        // here walks it past the first file and that file's picture never reaches the mux, while
+        // the log still says "Mux successful complete". A first file smaller than one read block
+        // vanished completely. Asking the container for a language is not worth silently dropping
+        // a reel, and an explicit lang= still works on joined tracks.
+        if (const auto demuxerIt = fileList.size() == 1 ? m_containerReader.m_demuxers.find(fileList[0])
+                                                        : m_containerReader.m_demuxers.end();
+            demuxerIt != m_containerReader.m_demuxers.end() && demuxerIt->second.m_demuxer)
+        {
+            std::map<int32_t, TrackInfo> trackList;
+            demuxerIt->second.m_demuxer->getTrackList(trackList);
+            if (const auto trackIt = trackList.find(pid); trackIt != trackList.end())
+                streamInfo.m_lang = trackIt->second.m_lang;
+        }
+    }
     m_totalSize += fileSize;
 
     if (auto* mergeReader = dynamic_cast<TrueHDAC3MergeReader*>(codecReader))
@@ -640,6 +681,72 @@ int METADemuxer::addStream(const string& codec, const string& codecStreamName, c
     }
 
     return streamIndex;
+}
+
+// Every parameter a track line may legally carry. Collected from BOTH ways the code consumes
+// them: the addParams.find() lookups, and the subtitle options that are matched by ITERATING the
+// map (metaDemuxer.cpp, "addParam.first == ..."). Missing the second group would have made this
+// warn about perfectly valid font settings.
+static bool isKnownTrackParam(const std::string& name)
+{
+    static const std::set<std::string> known = {
+        // general
+        "track", "subTrack", "lang", "timeshift", "default", "secondary", "subClip", "track-name",
+        // video
+        "fps", "ar", "level", "video-width", "video-height", "insertSEI", "forceSEI", "autoSEI", "contSPS",
+        "delPulldown", "stretch", "3d-plane",
+        // audio
+        "down-to-ac3", "down-to-dts", "merge-ac3-track", "merge-ac3-file",
+        // picture in picture
+        "pipCorner", "pipHOffset", "pipVOffset", "pipScale", "pipLumma",
+        // text subtitles
+        "font-name", "font-size", "font-color", "font-bold", "font-italic", "font-underline", "font-strike-out",
+        "font-border", "font-charset", "line-spacing", "bottom-offset", "fadein-time", "fadeout-time",
+        // set internally by muxerManager, never written by a user, but accepted so a round
+        // tripped meta does not warn
+        "srclang"};
+    return known.find(name) != known.end();
+}
+
+std::vector<AVChapter> METADemuxer::getChapters()
+{
+    // A Blu-ray playlist keeps its chapters as playlist marks rather than in any demuxer, so it
+    // has to be walked separately. Mark times are relative to the play item they belong to, and
+    // the play items run back to back, so each one's span has to be accumulated. Same arithmetic
+    // the playlist listing uses in main.cpp; all values are 45 kHz ticks.
+    for (auto& [name, mpls] : m_mplsStreamMap)
+    {
+        if (mpls.m_marks.empty() || mpls.m_playItems.empty())
+            continue;
+        std::vector<AVChapter> chapters;
+        int64_t playItemOffset = 0;
+        size_t markIndex = 0;
+        for (size_t i = 0; i < mpls.m_playItems.size(); ++i)
+        {
+            for (; markIndex < mpls.m_marks.size(); ++markIndex)
+            {
+                const PlayListMark& mark = mpls.m_marks[markIndex];
+                if (static_cast<size_t>(mark.m_playItemID) > i)
+                    break;
+                const int64_t ticks =
+                    static_cast<int64_t>(mark.m_markTime) - mpls.m_playItems[i].IN_time + playItemOffset;
+                if (ticks >= 0)
+                    chapters.emplace_back(ticks * 1000000000LL / 45000LL, std::string());
+            }
+            playItemOffset += mpls.m_playItems[i].OUT_time - mpls.m_playItems[i].IN_time;
+        }
+        if (!chapters.empty())
+            return chapters;
+    }
+
+    for (auto& [name, demuxerData] : m_containerReader.m_demuxers)
+    {
+        if (!demuxerData.m_demuxer)
+            continue;
+        if (std::vector<AVChapter> chapters = demuxerData.m_demuxer->getChapters(); !chapters.empty())
+            return chapters;
+    }
+    return {};
 }
 
 void METADemuxer::readClose()

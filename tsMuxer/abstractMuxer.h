@@ -29,6 +29,12 @@ class AbstractMuxer
     virtual bool muxPacket(AVPacket& avPacket) = 0;
     virtual void setFileName(const std::string& fileName, FileFactory* fileFactory);
 
+    /*
+     * Chapter start times in seconds. Only Matroska output uses them; the Blu-ray path takes the
+     * same list through BlurayHelper::createMPLSFile instead, and every other muxer ignores them.
+     */
+    virtual void setChapters(const std::vector<double>& chapters) {}
+
     virtual void joinToMasterFile() {}
     virtual void setSubMode(AbstractMuxer* mainMuxer, bool flushInterleavedBlock) {}
     virtual void setMasterMode(AbstractMuxer* subMuxer, bool flushInterleavedBlock) {}

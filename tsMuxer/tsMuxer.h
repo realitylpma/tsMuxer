@@ -190,6 +190,7 @@ class TSMuxer final : public AbstractMuxer
             m_pts = m_dts = ULLONG_MAX;
             m_tsCnt = 0;
             m_mpegReader = nullptr;
+            m_definesDuration = false;
         }
         int64_t m_pts;
         int64_t m_dts;
@@ -197,6 +198,9 @@ class TSMuxer final : public AbstractMuxer
         // downcast of the stream's codec reader, cached at intAddStream so muxPacket
         // does not pay a dynamic_cast per AVPacket; nullptr for non-video streams
         MPEGStreamReader* m_mpegReader;
+        // a primary video stream, the kind that gets PID 0x1011: neither secondary nor a
+        // Dolby Vision enhancement layer. These are the streams a title is measured by.
+        bool m_definesDuration;
     };
 
     int64_t m_minDts;
@@ -237,6 +241,9 @@ class TSMuxer final : public AbstractMuxer
     int64_t m_curFileStartPts;
     int64_t m_vbvLen;
     int m_mainStreamIndex;
+    // rank of the stream currently holding the main role: 3 primary video, 2 other video,
+    // 1 audio, 0 nothing chosen yet. A lower rank never displaces a higher one.
+    int m_mainStreamRank;
 
     std::string m_outFileName;
     int m_writeBlockSize;

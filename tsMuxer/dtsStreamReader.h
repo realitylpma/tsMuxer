@@ -43,6 +43,9 @@ class DTSStreamReader final : public SimplePacketizerReader
         core_ext_mask = 0;
         m_dtsEsChannels = 0;
         m_testMode = false;
+        m_isDtsX = false;
+        m_dtsxFramesProbed = 0;
+        m_dtsxHits = 0;
     }
     int getTSDescriptor(uint8_t* dstBuff, bool blurayMode, bool hdmvDescriptors) override;
     void setDownconvertToDTS(const bool value) { m_downconvertToDTS = value; }
@@ -121,6 +124,9 @@ class DTSStreamReader final : public SimplePacketizerReader
     int core_ext_mask;
     int m_dtsEsChannels;
     bool m_testMode;
+    bool m_isDtsX;
+    int m_dtsxFramesProbed;
+    int m_dtsxHits;
 
     double m_frameDuration;
     int syncInfo16be(const uint8_t* p_buf);
@@ -129,6 +135,7 @@ class DTSStreamReader final : public SimplePacketizerReader
     static void BufLeToBe(uint8_t* p_out, const uint8_t* p_in, int i_in);
     [[nodiscard]] int getSurroundModeCode() const;
     int decodeHdInfo(uint8_t* buff, const uint8_t* end);
+    void probeDtsX(uint8_t* buff, const uint8_t* end);
     void checkIfOnlyHDDataExists(uint8_t* buff, const uint8_t* end);
 };
 

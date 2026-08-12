@@ -430,7 +430,10 @@ Additional parameters for audio tracks:
 - down-to-dts       Available only for DTS-HD tracks. Filter out HD part.
 - down-to-ac3       For TRUE-HD and E-AC3 (DD+) tracks. Keep the AC-3 core, drop the HD part.
 - secondary         Mux as secondary audio. Available for DD+ and DTS-Express.
-- default           Mark this track as the default when muxing to Blu-ray.
+- default           Mark this track as the default. Used for Blu-ray, and written as the
+                    Matroska default flag when the output is MKV. Without it the first track
+                    of each type is the default.
+- track-name        Track name, MKV output only. Shown by players in the track list.
 - stretch           Stretch audio by a given factor. Can be a decimal value or a
                     fraction (e.g. 25/24). Useful for fixing A/V sync issues
                     caused by frame rate discrepancies.
@@ -490,7 +493,10 @@ Additional parameters for PG and SRT tracks:
 
 - video-width       The width of the video in pixels.
 - video-height      The height of the video in pixels.
-- default           Mark this track as the default when muxing to Blu-ray.
+- default           Mark this track as the default. Used for Blu-ray, and written as the
+                    Matroska default flag when the output is MKV. Without it the first track
+                    of each type is the default.
+- track-name        Track name, MKV output only. Shown by players in the track list.
                     Allowed values are "all" which causes all subtitles to be
                     shown, and "forced" which shows only elements marked as
                     "forced" in the subtitle stream.
@@ -630,13 +636,36 @@ All parameters in this group start with two dashes:
                       SEPARATED list for BDXL: 100GB has 2 breaks (Free/3, 2*Free/3), 128GB
                       has 3. Read the total from the disc's FULL formatted capacity (ImgBurn
                       "Free Sectors"), NOT a partial/POW value (which gives a wrong break).
---bdmv-to-iso         Separate mode: tsMuxeR --bdmv-to-iso [--layer-break-guard=<MB>]
-                      [--layer-break-guard-before=<MB>] [--layer-break-lbn=<s[,s...]>] <BDMV_folder> <out.iso>
+--bdmv-to-iso         Separate mode: tsMuxeR --bdmv-to-iso [options] <BDMV_folder> <out.iso>
                       Wrap an existing BDMV folder into a UDF 2.50 BD-ROM ISO byte-for-byte
                       - no re-mux, no re-numbering - so BD-J menus and
                       all clip/playlist references stay valid, while applying the
                       dual-layer guard band. The largest .m2ts is written first so the
                       main title straddles the layer break and gets the guard.
+                      Options for this mode:
+                        --layer-break-guard=<MB>         see above
+                        --layer-break-guard-before=<MB>  see above
+                        --layer-break-lbn=<s[,s...]>     see above
+                        --disc-capacity=<sectors>  Total sectors of the target disc. Needed by
+                              --inner-only, and used to decide whether a file fits after the
+                              break. Read it from the disc's FULL formatted capacity.
+                        --keep-extra-files  Copy EVERYTHING in the source folder, not just
+                              BDMV, CERTIFICATE and AACS. Without this, anything else at the
+                              top level is skipped with a "skipping ..." line: helper folders
+                              from ripping tools, cover art, and also the companion asset
+                              folders some discs place beside BDMV for their BD-J features.
+                              If your source has such folders and you want a faithful image,
+                              use this.
+                        --inner-only  Keep the payload on the inner tracks of every layer and
+                              pad each layer's outer rim with zeros, where discs burn worst.
+                              Widens the layer-break guard symmetrically to (free space)/2 per
+                              break. Requires --disc-capacity.
+                        --original-order  Write the files in disc order instead of largest
+                              .m2ts first. Better for seamless branching titles, whose many
+                              segments should stay physically close to their playback order.
+                        --no-layer-fit  Do not move a file that would cross the layer break to
+                              start after it; split it instead.
+                        --label=<string>  Volume label for the image.
 )help";
     LTRACE(LT_INFO, 2, help);
 }
@@ -1201,7 +1230,12 @@ int main(int argc, char** argv)
                     if (mode3D)
                         itemName = streamDir + string("SSIF") + getDirSeparator() + item.fileName + ".ssif";
                     else
-                        itemName = streamDir.append(item.fileName).append(mediaExt);  // 2d mode
+                        // Must not be streamDir.append(...): append MUTATES, and streamDir is
+                        // shared across every play item, so each iteration permanently grew it and
+                        // the printed name accumulated every previous clip. The GUI parses these
+                        // lines into its playlist file list (tsmuxerwindow.cpp), so the wrong names
+                        // were user visible. The 3D branch above already builds a temporary.
+                        itemName = streamDir + item.fileName + mediaExt;  // 2d mode
 
                     LTRACE(LT_INFO, 2, "");
                     LTRACE(LT_INFO, 2, "File #" << strPadLeft(int64ToStr(i), 5, '0') << " name=" << itemName);
@@ -1286,6 +1320,10 @@ int main(int argc, char** argv)
 
             if (muxerManager.getTrackCnt() == 0)
                 THROW(ERR_COMMON, "No tracks selected")
+            // Same list the Blu-ray path hands to createMPLSFile. checkBluRayMux() has already
+            // parsed --custom-chapters out of the meta above, whatever the output format is.
+            if (!customChapterList.empty())
+                muxerManager.setChapters(customChapterList);
             muxerManager.doMux(dstFile, nullptr);
 
             LTRACE(LT_INFO, 2, "Mux successful complete");

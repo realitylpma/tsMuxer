@@ -299,6 +299,10 @@ HevcSpsUnit::HevcSpsUnit()
       nal_hrd_parameters_present_flag(false),
       vcl_hrd_parameters_present_flag(false),
       sub_pic_hrd_params_present_flag(false),
+      conf_win_left_offset(0),
+      conf_win_right_offset(0),
+      conf_win_top_offset(0),
+      conf_win_bottom_offset(0),
       colour_primaries(2),
       transfer_characteristics(2),
       matrix_coeffs(2),
@@ -569,10 +573,10 @@ int HevcSpsUnit::deserialize()
 
         if (m_reader.getBit())  // conformance_window_flag
         {
-            extractUEGolombCode();  // conf_win_left_offset ue(v)
-            extractUEGolombCode();  // conf_win_right_offset ue(v)
-            extractUEGolombCode();  // conf_win_top_offset ue(v)
-            extractUEGolombCode();  // conf_win_bottom_offset ue(v)
+            conf_win_left_offset = extractUEGolombCode();
+            conf_win_right_offset = extractUEGolombCode();
+            conf_win_top_offset = extractUEGolombCode();
+            conf_win_bottom_offset = extractUEGolombCode();
         }
 
         bit_depth_luma_minus8 = extractUEGolombCode();
@@ -685,8 +689,11 @@ double HevcSpsUnit::getFPS() const
 string HevcSpsUnit::getDescription() const
 {
     string result = getProfileString();
-    result += string(" Resolution: ") + int32uToStr(pic_width_in_luma_samples) + string(":") +
-              int32uToStr(pic_height_in_luma_samples);
+    // The DISPLAYED size, not the coded one. An encoder pads the coded picture up to a coding
+    // block multiple and the conformance window says how much of that is not shown, so a 2160
+    // line picture is often coded as 2176. Reporting the coded size told the user the wrong
+    // resolution.
+    result += string(" Resolution: ") + int32uToStr(getDisplayWidth()) + string(":") + int32uToStr(getDisplayHeight());
     result += interlaced_source_flag ? string("i") : string("p");
 
     const double fps = getFPS();
@@ -766,9 +773,15 @@ int HevcHdrUnit::deserialize()
             {
                 isHDR10 = true;
                 V3_flags |= HDR10;
+                // SEI 137 sends the display primaries in the order GREEN, BLUE, RED, not RGB.
+                // Two of these three comments used to name the wrong colour. The values were
+                // always right, because they are read and written positionally, but anyone
+                // reading the old comments would have "corrected" working code. Confirmed
+                // against a pressed disc: index 0 is (8500, 39850) BT.2020 green, index 1 is
+                // (6550, 2300) blue and index 2 is (35400, 14600) red.
                 HDR10_metadata[0] = m_reader.getBits(32);  // display_primaries Green
-                HDR10_metadata[1] = m_reader.getBits(32);  // display_primaries Red
-                HDR10_metadata[2] = m_reader.getBits(32);  // display_primaries Blue
+                HDR10_metadata[1] = m_reader.getBits(32);  // display_primaries Blue
+                HDR10_metadata[2] = m_reader.getBits(32);  // display_primaries Red
                 HDR10_metadata[3] = m_reader.getBits(32);  // White Point
                 // These two reads MUST stay in separate statements. As operands of '+' the two
                 // getBits(32) calls are only indeterminately sequenced, so the compiler may read

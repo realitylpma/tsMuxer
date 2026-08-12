@@ -3184,9 +3184,13 @@ void TsMuxerWindow::updateMetaLines()
         postfix.clear();
         if (codecInfo->programName.startsWith('S'))
         {
-            if (isDiskOutput() && ui->defaultSubTrackCheckBox->isChecked() &&
+            if ((isDiskOutput() || ui->radioButtonMKV->isChecked()) && ui->defaultSubTrackCheckBox->isChecked() &&
                 ui->defaultSubTrackComboBox->currentData().toInt() == i)
             {
+                // The forced/all distinction is a disc concept: on a disc it selects which subtitle
+                // the player shows by default, and Matroska has no equivalent of "forced only" in
+                // this field. The muxer only asks whether the key is present, so either value marks
+                // the track as the default one in an .mkv, and the disc meaning is unchanged.
                 postfix +=
                     QString(", default=") + (ui->defaultSubTrackForcedOnlyCheckBox->isChecked() ? "forced" : "all");
             }
@@ -3223,7 +3227,11 @@ void TsMuxerWindow::updateMetaLines()
             metaContent.append(prefix + getVideoMetaInfo(codecInfo) + postfix + '\n');
         else
         {
-            if (isDiskOutput() && ui->defaultAudioTrackCheckBox->isChecked() &&
+            // Matroska honours "default" as of 2.16.0, so the choice must reach the meta for an
+            // .mkv as well, not only for a disc. Without this the checkbox is present, is
+            // settable, and silently does nothing on the one output format where a viewer would
+            // notice: every player would just take the first audio track.
+            if ((isDiskOutput() || ui->radioButtonMKV->isChecked()) && ui->defaultAudioTrackCheckBox->isChecked() &&
                 ui->defaultAudioTrackComboBox->currentData().toInt() == i && codecInfo->programName.startsWith('A'))
             {
                 postfix += QString(", default");

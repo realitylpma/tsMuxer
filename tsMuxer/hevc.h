@@ -105,6 +105,27 @@ struct HevcSpsUnit : HevcUnitWithProfile
     bool separate_colour_plane_flag;
     unsigned pic_width_in_luma_samples;
     unsigned pic_height_in_luma_samples;
+    // Conformance window, in chroma units. The coded picture is padded up to a coding block
+    // multiple and this is how much of it is not displayed, so the displayed size is the coded
+    // size minus these. They used to be parsed and thrown away.
+    unsigned conf_win_left_offset;
+    unsigned conf_win_right_offset;
+    unsigned conf_win_top_offset;
+    unsigned conf_win_bottom_offset;
+
+    // Displayed size: the coded size minus the conformance window. Offsets are in chroma units.
+    [[nodiscard]] unsigned getDisplayWidth() const
+    {
+        const unsigned subWidthC = (chromaFormat == 1 || chromaFormat == 2) ? 2 : 1;
+        const unsigned crop = (conf_win_left_offset + conf_win_right_offset) * subWidthC;
+        return crop < pic_width_in_luma_samples ? pic_width_in_luma_samples - crop : 0;
+    }
+    [[nodiscard]] unsigned getDisplayHeight() const
+    {
+        const unsigned subHeightC = chromaFormat == 1 ? 2 : 1;
+        const unsigned crop = (conf_win_top_offset + conf_win_bottom_offset) * subHeightC;
+        return crop < pic_height_in_luma_samples ? pic_height_in_luma_samples - crop : 0;
+    }
     unsigned bit_depth_luma_minus8;
     unsigned bit_depth_chroma_minus8;
     unsigned log2_max_pic_order_cnt_lsb;

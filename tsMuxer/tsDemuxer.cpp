@@ -37,8 +37,10 @@ TSDemuxer::TSDemuxer(const BufferedReaderManager& readManager, const char* strea
     m_lastReadRez = 0;
     m_m2tsHdrDiscarded = false;
     m_firstPTS = -1;
+    m_firstSeenPTS = -1;
     m_lastPTS = -1;
     m_firstVideoPTS = -1;
+    m_firstSeenVideoPTS = -1;
     m_lastVideoPTS = -1;
     m_lastVideoDTS = -1;
     m_videoDtsGap = -1;
@@ -254,8 +256,10 @@ int TSDemuxer::simpleDemuxBlock(DemuxedData& demuxedData, const PIDSet& accepted
                 m_prevFileLen += (m_lastPTS - m_firstPTS);
         }
         m_firstPTS = -1;
+        m_firstSeenPTS = -1;
         m_lastPTS = -1;
         m_firstVideoPTS = -1;
+        m_firstSeenVideoPTS = -1;
         m_lastVideoPTS = -1;
         m_curFileNum++;
     }
@@ -380,10 +384,15 @@ int TSDemuxer::simpleDemuxBlock(DemuxedData& demuxedData, const PIDSet& accepted
                 if (m_firstPTS == -1 || curPts < m_firstPTS)
                     m_firstPTS = curPts;
 
+                if (m_firstSeenPTS == -1)
+                    m_firstSeenPTS = curPts;
+
                 if (streamInfo != m_pmt.pidList.end() && isVideoPID(streamInfo->second.m_streamType))
                 {
                     if (m_firstVideoPTS == -1 || curPts < m_firstVideoPTS)
                         m_firstVideoPTS = curPts;
+                    if (m_firstSeenVideoPTS == -1)
+                        m_firstSeenVideoPTS = curPts;
                     if (curPts > m_lastVideoPTS)
                         m_lastVideoPTS = curPts;
                     if (m_lastVideoDTS == -1)
@@ -392,8 +401,7 @@ int TSDemuxer::simpleDemuxBlock(DemuxedData& demuxedData, const PIDSet& accepted
                         m_videoDtsGap = curDts - m_lastVideoDTS;
                 }
 
-                if (m_firstPtsTime.find(pid) == m_firstPtsTime.end() ||
-                    (m_curFileNum == 0 && curPts < m_firstPtsTime[pid]))
+                if (m_firstPtsTime.find(pid) == m_firstPtsTime.end())
                     m_firstPtsTime[pid] = curPts;
             }
 

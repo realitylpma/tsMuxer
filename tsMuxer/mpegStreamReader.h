@@ -56,6 +56,16 @@ class MPEGStreamReader : public AbstractStreamReader
     void setBuffer(uint8_t* data, uint32_t dataLen, bool lastBlock = false) override;
     int readPacket(AVPacket& avPacket) override;
     int flushPacket(AVPacket& avPacket) override;
+    /*
+     * Colour description from the bitstream, as the coded values of ISO/IEC 23091-4. Returns
+     * false when the stream does not signal one. Matroska output writes these into the Colour
+     * element; the Blu-ray path does not need them because a disc carries HDR differently.
+     */
+    [[nodiscard]] virtual bool getColourDesc(uint8_t& primaries, uint8_t& transfer, uint8_t& matrix) const
+    {
+        return false;
+    }
+
     [[nodiscard]] virtual unsigned getStreamWidth() const = 0;
     [[nodiscard]] virtual unsigned getStreamHeight() const = 0;
     virtual bool getInterlaced() = 0;
@@ -66,7 +76,7 @@ class MPEGStreamReader : public AbstractStreamReader
     /// StreamDiscoveryData struct with video-specific properties.
     /// Subclasses must implement checkStream() with their own signature;
     /// this helper fills common video fields after a successful check.
-    void fillVideoDiscoveryData(StreamDiscoveryData& data);
+    virtual void fillVideoDiscoveryData(StreamDiscoveryData& data);
 
     virtual void onShiftBuffer(int offset);
 

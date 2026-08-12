@@ -109,6 +109,33 @@ static constexpr uint16_t MATROSKA_ID_VIDEOSTEREOMODE = 0x53B9;
 static constexpr uint16_t MATROSKA_ID_VIDEOASPECTRATIO = 0x54B3;
 static constexpr uint32_t MATROSKA_ID_VIDEOCOLOURSPACE = 0x2EB524;
 
+/* Block addition mapping, used to carry the Dolby Vision configuration records */
+static constexpr uint16_t MATROSKA_ID_MAXBLOCKADDITIONID = 0x55EE;
+static constexpr uint16_t MATROSKA_ID_BLOCKADDITIONMAPPING = 0x41E4;
+static constexpr uint16_t MATROSKA_ID_BLOCKADDIDVALUE = 0x41F0;
+static constexpr uint16_t MATROSKA_ID_BLOCKADDIDTYPE = 0x41E7;
+static constexpr uint16_t MATROSKA_ID_BLOCKADDIDEXTRADATA = 0x41ED;
+
+/* Colour description and HDR mastering metadata, inside the Video master */
+static constexpr uint16_t MATROSKA_ID_VIDEOCOLOUR = 0x55B0;
+static constexpr uint16_t MATROSKA_ID_COLOURMATRIXCOEFF = 0x55B1;
+static constexpr uint16_t MATROSKA_ID_COLOURRANGE = 0x55B9;
+static constexpr uint16_t MATROSKA_ID_COLOURTRANSFERCHARACTER = 0x55BA;
+static constexpr uint16_t MATROSKA_ID_COLOURPRIMARIES = 0x55BB;
+static constexpr uint16_t MATROSKA_ID_COLOURMAXCLL = 0x55BC;
+static constexpr uint16_t MATROSKA_ID_COLOURMAXFALL = 0x55BD;
+static constexpr uint16_t MATROSKA_ID_MASTERINGMETADATA = 0x55D0;
+static constexpr uint16_t MATROSKA_ID_PRIMARYRCHROMATICITYX = 0x55D1;
+static constexpr uint16_t MATROSKA_ID_PRIMARYRCHROMATICITYY = 0x55D2;
+static constexpr uint16_t MATROSKA_ID_PRIMARYGCHROMATICITYX = 0x55D3;
+static constexpr uint16_t MATROSKA_ID_PRIMARYGCHROMATICITYY = 0x55D4;
+static constexpr uint16_t MATROSKA_ID_PRIMARYBCHROMATICITYX = 0x55D5;
+static constexpr uint16_t MATROSKA_ID_PRIMARYBCHROMATICITYY = 0x55D6;
+static constexpr uint16_t MATROSKA_ID_WHITEPOINTCHROMATICITYX = 0x55D7;
+static constexpr uint16_t MATROSKA_ID_WHITEPOINTCHROMATICITYY = 0x55D8;
+static constexpr uint16_t MATROSKA_ID_LUMINANCEMAX = 0x55D9;
+static constexpr uint16_t MATROSKA_ID_LUMINANCEMIN = 0x55DA;
+
 /* IDs in the trackaudio master */
 static constexpr uint8_t MATROSKA_ID_AUDIOSAMPLINGFREQ = 0xB5;
 static constexpr uint16_t MATROSKA_ID_AUDIOOUTSAMPLINGFREQ = 0x78B5;

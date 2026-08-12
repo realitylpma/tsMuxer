@@ -115,6 +115,17 @@ void MuxerManager::preinitMux(const std::string& outFileName, FileFactory* fileF
                 if (tsMuxer)
                     tsMuxer->setPtsOffset(m_ptsOffset);
                 m_mainMuxer->parseMuxOpt(m_muxOpts);
+                // Now that the muxer exists it can be given the chapter list main() supplied.
+                // With no --custom-chapters, fall back to whatever the source container carries,
+                // the same way a source language fills in for a missing lang=. An MKV with its
+                // own chapter list used to lose every mark on a remux.
+                if (m_chapters.empty())
+                {
+                    for (const auto& chapter : m_metaDemuxer.getChapters())
+                        m_chapters.push_back(static_cast<double>(chapter.start) / 1e9);
+                }
+                if (!m_chapters.empty())
+                    m_mainMuxer->setChapters(m_chapters);
             }
         }
     }
@@ -162,6 +173,13 @@ void MuxerManager::preinitMux(const std::string& outFileName, FileFactory* fileF
         {
             si.m_streamReader->applyDiscoveryData(m_discoveryData[i]);
         }
+
+        // A language taken from the source container travels under its own key. An explicit lang=
+        // is already in m_addParams and must win, so only fill the gap. Keeping it out of "lang"
+        // is what stops SingleFileMuxer from renaming demuxed files: that muxer reads only "lang"
+        // and never sees this one.
+        if (!si.m_lang.empty() && si.m_addParams.find("lang") == si.m_addParams.end())
+            si.m_addParams["srclang"] = si.m_lang;
 
         if (si.m_isSubStream && m_allowStereoMux)
         {

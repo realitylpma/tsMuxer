@@ -31,6 +31,12 @@ class MuxerManager final
 
     void doMux(const std::string& outFileName, FileFactory* fileFactory);
 
+    // Stored, not forwarded here: the output muxer does not exist yet when main() calls this,
+    // it is created inside doMux(). Forwarding immediately silently did nothing.
+    // Matroska writes these as a Chapters master; every other muxer ignores them, because the
+    // Blu-ray path takes the same list a different way.
+    void setChapters(const std::vector<double>& chapters) { m_chapters = chapters; }
+
     void setCutStart(const int64_t value) { m_cutStart = value; }
     [[nodiscard]] int64_t getCutStart() const { return m_cutStart; }
 
@@ -82,6 +88,7 @@ class MuxerManager final
     void asyncWriteBlock(const WriterData& data) const;
     void checkTrackList(const std::vector<StreamInfo>& ci) const;
 
+    std::vector<double> m_chapters;  // chapter start times in seconds, applied once the muxer exists
     std::unique_ptr<AbstractMuxer> m_mainMuxer;
     std::unique_ptr<AbstractMuxer> m_subMuxer;
 

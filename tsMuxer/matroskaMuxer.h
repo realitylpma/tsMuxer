@@ -56,8 +56,12 @@ class MatroskaMuxer final : public AbstractMuxer
     bool close() override;
     void openDstFile() override;
     void parseMuxOpt(const std::string& opts) override;
+    void setChapters(const std::vector<double>& chapters) override { m_chapters = chapters; }
 
    private:
+    std::vector<double> m_chapters;  // start times in seconds
+    void writeChapters();
+
     // ── Track information collected during intAddStream ──
     struct MkvTrackInfo
     {
@@ -67,6 +71,10 @@ class MatroskaMuxer final : public AbstractMuxer
         std::string matroskaCodecID;  // e.g. "V_MPEG4/ISO/AVC"
         int codecID;                  // internal CODEC_* constant
         uint8_t trackType;            // 1=video, 2=audio, 17=subtitle
+        std::string language;         // ISO 639-2 code, empty means write "und"
+        std::string name;             // track-name=, optional
+        bool markedDefault;           // the meta carried "default" on this track
+        bool isDefault;               // resolved: exactly one per track type
         AbstractStreamReader* codecReader;
 
         // Video-specific
@@ -75,6 +83,17 @@ class MatroskaMuxer final : public AbstractMuxer
         double fps;
         bool interlaced;
         VideoAspectRatio streamAR;
+
+        // Colour description from the bitstream, and HDR10 mastering data when the stream has it.
+        bool hasColourDesc;
+        uint8_t colourPrimaries;
+        uint8_t colourTransfer;
+        uint8_t colourMatrix;
+        bool isHdr10;
+
+        // Dolby Vision configuration record and its BlockAddIDType (dvcC or dvvC), 0 if not DV.
+        uint32_t dvBlockAddIdType;
+        uint8_t dvConfig[24];
 
         // Audio-specific
         int sampleRate;
@@ -104,6 +123,15 @@ class MatroskaMuxer final : public AbstractMuxer
               fps(0),
               interlaced(false),
               streamAR(VideoAspectRatio::AR_KEEP_DEFAULT),
+              markedDefault(false),
+              isDefault(false),
+              hasColourDesc(false),
+              colourPrimaries(2),
+              colourTransfer(2),
+              colourMatrix(2),
+              isHdr10(false),
+              dvBlockAddIdType(0),
+              dvConfig{},
               sampleRate(0),
               channels(0),
               bitDepth(0),
@@ -147,6 +175,7 @@ class MatroskaMuxer final : public AbstractMuxer
     void writeTracks();
     // Write a single TrackEntry and return its serialized bytes
     std::vector<uint8_t> buildTrackEntry(const MkvTrackInfo& track);
+    static int writeColourInfo(uint8_t* dst, const MkvTrackInfo& track);
 
     // Start a new cluster at the given timecode (milliseconds)
     void startCluster(int64_t timecodeMs);

@@ -24,6 +24,7 @@
 #include "nalUnits.h"
 #include "opusStreamReader.h"
 #include "simplePacketizerReader.h"
+#include "tsMuxer.h"  // HDR10_metadata, filled from the HEVC SEI while parsing
 #include "vodCoreException.h"
 #include "vvc.h"
 #include "vvcStreamReader.h"
@@ -254,8 +255,7 @@ std::string MatroskaMuxer::codecNameToMatroskaID(const std::string& codecName, i
 // ──────────────── intAddStream ───────────────────────────────────────────────
 
 void MatroskaMuxer::intAddStream(const std::string& /*streamName*/, const std::string& codecName, int streamIndex,
-                                 const std::map<std::string, std::string>& /*params*/,
-                                 AbstractStreamReader* codecReader)
+                                 const std::map<std::string, std::string>& params, AbstractStreamReader* codecReader)
 {
     MkvTrackInfo track;
     track.streamIndex = streamIndex;
@@ -263,6 +263,18 @@ void MatroskaMuxer::intAddStream(const std::string& /*streamName*/, const std::s
     track.codecReader = codecReader;
     track.codecID = codecReader->getCodecInfo().codecID;
     track.matroskaCodecID = codecNameToMatroskaID(codecName, track.codecID);
+
+    // Same parameter map the TS muxer reads the language from (tsMuxer.cpp). An explicit lang=
+    // wins; "srclang" is the language muxerManager carried over from the source container.
+    if (const auto itr = params.find("lang"); itr != params.end())
+        track.language = itr->second;
+    else if (const auto src = params.find("srclang"); src != params.end())
+        track.language = src->second;
+
+    if (const auto nm = params.find("track-name"); nm != params.end())
+        track.name = nm->second;
+    // "default" already exists and is documented for Blu-ray; it just never reached Matroska.
+    track.markedDefault = params.find("default") != params.end();
 
     // Generate a random UID
     static std::mt19937_64 rng(std::random_device{}());
@@ -683,11 +695,67 @@ void MatroskaMuxer::writeSegmentInfo()
 
 // ──────────────── Tracks ─────────────────────────────────────────────────────
 
+int MatroskaMuxer::writeColourInfo(uint8_t* dst, const MkvTrackInfo& track)
+{
+    const bool haveMastering = track.isHdr10 && (HDR10_metadata[3] != 0 || HDR10_metadata[4] != 0);
+    if (!track.hasColourDesc && !haveMastering)
+        return 0;
+
+    uint8_t body[256];
+    int p = 0;
+    if (track.hasColourDesc)
+    {
+        p += ebml_write_uint(body + p, MATROSKA_ID_COLOURMATRIXCOEFF, track.colourMatrix);
+        p += ebml_write_uint(body + p, MATROSKA_ID_COLOURTRANSFERCHARACTER, track.colourTransfer);
+        p += ebml_write_uint(body + p, MATROSKA_ID_COLOURPRIMARIES, track.colourPrimaries);
+    }
+
+    if (haveMastering)
+    {
+        // MaxCLL and MaxFALL live beside MasteringMetadata, not inside it. Both are written only
+        // when non-zero: a stream can legitimately signal zeros, and writing those back says
+        // "measured as zero" rather than "unknown", so passing them on would be wrong.
+        const unsigned maxCLL = HDR10_metadata[5] >> 16;
+        const unsigned maxFALL = HDR10_metadata[5] & 0xffff;
+        if (maxCLL)
+            p += ebml_write_uint(body + p, MATROSKA_ID_COLOURMAXCLL, maxCLL);
+        if (maxFALL)
+            p += ebml_write_uint(body + p, MATROSKA_ID_COLOURMAXFALL, maxFALL);
+
+        constexpr double CHROMA_UNIT = 50000.0;  // SEI sends 0.00002 units
+        uint8_t mm[192];
+        int m = 0;
+        const auto x = [](const unsigned packed) { return (packed >> 16) / CHROMA_UNIT; };
+        const auto y = [](const unsigned packed) { return (packed & 0xffff) / CHROMA_UNIT; };
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYGCHROMATICITYX, x(HDR10_metadata[0]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYGCHROMATICITYY, y(HDR10_metadata[0]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYBCHROMATICITYX, x(HDR10_metadata[1]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYBCHROMATICITYY, y(HDR10_metadata[1]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYRCHROMATICITYX, x(HDR10_metadata[2]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_PRIMARYRCHROMATICITYY, y(HDR10_metadata[2]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_WHITEPOINTCHROMATICITYX, x(HDR10_metadata[3]));
+        m += ebml_write_float(mm + m, MATROSKA_ID_WHITEPOINTCHROMATICITYY, y(HDR10_metadata[3]));
+        // HDR10_metadata[4] packs max in whole cd/m2 (already divided by 10000 on parse) and min
+        // still in 0.0001 cd/m2 units.
+        m += ebml_write_float(mm + m, MATROSKA_ID_LUMINANCEMAX, static_cast<double>(HDR10_metadata[4] >> 16));
+        m += ebml_write_float(mm + m, MATROSKA_ID_LUMINANCEMIN, (HDR10_metadata[4] & 0xffff) / 10000.0);
+
+        p += ebml_write_master_open(body + p, MATROSKA_ID_MASTERINGMETADATA, m);
+        memcpy(body + p, mm, m);
+        p += m;
+    }
+
+    int pos = ebml_write_master_open(dst, MATROSKA_ID_VIDEOCOLOUR, p);
+    memcpy(dst + pos, body, p);
+    return pos + p;
+}
+
 std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
 {
     // Build inner content of the TrackEntry.
-    // Size the buffer dynamically: fixed fields (~256 bytes) + codec private data.
-    const size_t bufSize = 512 + track.codecPrivate.size();
+    // Size the buffer dynamically: fixed fields + colour and mastering metadata (~130 bytes on
+    // its own, eight 64 bit floats among them) + codec private data.
+    const size_t bufSize = 1024 + track.codecPrivate.size();
     std::vector<uint8_t> inner(bufSize);
     int pos = 0;
 
@@ -695,7 +763,15 @@ std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
     pos += ebml_write_uint(inner.data() + pos, MATROSKA_ID_TRACKUID, track.trackUID);
     pos += ebml_write_uint(inner.data() + pos, MATROSKA_ID_TRACKTYPE, track.trackType);
     pos += ebml_write_uint(inner.data() + pos, MATROSKA_ID_TRACKFLAGLACING, 0);
+    pos += ebml_write_uint(inner.data() + pos, MATROSKA_ID_TRACKFLAGDEFAULT, track.isDefault ? 1 : 0);
+    if (!track.name.empty())
+        pos += ebml_write_string(inner.data() + pos, MATROSKA_ID_TRACKNAME, track.name);
     pos += ebml_write_string(inner.data() + pos, MATROSKA_ID_CODECID, track.matroskaCodecID);
+
+    // Matroska treats a MISSING Language as "eng", so leaving it out does not mean "unknown", it
+    // silently claims every untagged track is English. Write "und" instead when we have nothing.
+    pos += ebml_write_string(inner.data() + pos, MATROSKA_ID_TRACKLANGUAGE,
+                             track.language.empty() ? std::string("und") : track.language);
 
     if (!track.codecPrivate.empty())
     {
@@ -712,7 +788,10 @@ std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
     // Video sub-element
     if (track.trackType == 1 && track.width > 0 && track.height > 0)
     {
-        uint8_t videoBuf[128];
+        // Big enough for the dimensions plus the whole Colour master: MasteringMetadata alone is
+        // eight 64 bit floats. The old 128 was sized before any of that existed and overflowed
+        // the moment colour metadata was written into it.
+        uint8_t videoBuf[512];
         int vPos = 0;
         vPos += ebml_write_uint(videoBuf + vPos, MATROSKA_ID_VIDEOPIXELWIDTH, track.width);
         vPos += ebml_write_uint(videoBuf + vPos, MATROSKA_ID_VIDEOPIXELHEIGHT, track.height);
@@ -745,10 +824,42 @@ std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
             }
         }
 
+        // Colour description, and HDR10 mastering metadata when the stream carries it.
+        //
+        // Every value here is ALREADY parsed for the Blu-ray path: the VUI colour fields at
+        // hevc.cpp:400-402 and the SEI 137 / SEI 144 payloads in HDR10_metadata. Nothing new is
+        // decoded. Writing them means a Blu-ray remuxed to MKV is correctly tagged without the
+        // user having to supply the values by hand, which is not something the usual reference
+        // muxer does: it propagates a Colour element that a source container already has, or
+        // takes explicit options, but it never derives one from the bitstream.
+        //
+        // ORDER TRAP: SEI 137 sends the display primaries as GREEN, BLUE, RED, not RGB. The
+        // comments at hevc.cpp:769-771 get two of the three wrong. HDR10_metadata[0] is green,
+        // [1] is blue, [2] is red, [3] is the white point, each packed as (x << 16) | y in units
+        // of 0.00002. Matroska wants floats in the 0..1 range, hence the 50000 divisor.
+        vPos += writeColourInfo(videoBuf + vPos, track);
+
         // Write Video master
         pos += ebml_write_master_open(inner.data() + pos, MATROSKA_ID_TRACKVIDEO, vPos);
         memcpy(inner.data() + pos, videoBuf, vPos);
         pos += vPos;
+
+        // Dolby Vision configuration, as a BlockAdditionMapping beside the Video master. Without
+        // it a player has no way to know the track is Dolby Vision, even when the RPU is present
+        // in the stream, so the track simply plays as its HDR10 base layer.
+        if (track.dvBlockAddIdType)
+        {
+            uint8_t body[64];
+            int b = 0;
+            b += ebml_write_uint(body + b, MATROSKA_ID_BLOCKADDIDVALUE, 1);
+            b += ebml_write_uint(body + b, MATROSKA_ID_BLOCKADDIDTYPE, track.dvBlockAddIdType);
+            b += ebml_write_binary(body + b, MATROSKA_ID_BLOCKADDIDEXTRADATA, track.dvConfig,
+                                   static_cast<int>(sizeof(track.dvConfig)));
+            pos += ebml_write_uint(inner.data() + pos, MATROSKA_ID_MAXBLOCKADDITIONID, 1);
+            pos += ebml_write_master_open(inner.data() + pos, MATROSKA_ID_BLOCKADDITIONMAPPING, b);
+            memcpy(inner.data() + pos, body, b);
+            pos += b;
+        }
     }
 
     // Audio sub-element
@@ -825,8 +936,38 @@ void MatroskaMuxer::openDstFile()
 
 void MatroskaMuxer::refreshTrackProperties()
 {
+    // Resolve exactly one default track per type. A MISSING FlagDefault means 1 in Matroska, so
+    // writing nothing made every track claim to be the default, including two audio tracks at
+    // once. Honour an explicit "default" where the meta gave one, otherwise the first track of
+    // that type, and write the flag on every track so nothing is left to the spec default.
+    std::set<uint8_t> typeHasExplicit;
+    for (auto& [streamIdx, track] : m_tracks)
+        if (track.markedDefault)
+            typeHasExplicit.insert(track.trackType);
+    std::set<uint8_t> typeDone;
     for (auto& [streamIdx, track] : m_tracks)
     {
+        const bool wantIt =
+            typeHasExplicit.count(track.trackType) ? track.markedDefault : !typeDone.count(track.trackType);
+        track.isDefault = wantIt && !typeDone.count(track.trackType);
+        if (track.isDefault)
+            typeDone.insert(track.trackType);
+    }
+
+    for (auto& [streamIdx, track] : m_tracks)
+    {
+        // The codec ID has to be re-derived here for the same reason the sizes below do. At
+        // intAddStream time an AC-3 family reader has not seen a frame yet, so isEAC3() is still
+        // false and getCodecInfo() hands back the plain AC-3 entry: an E-AC-3 track was being
+        // declared as A_AC3 and a TrueHD track would be too. The payload was always correct, only
+        // the CodecID was wrong, so a player that trusts it would decode the wrong thing.
+        const CodecInfo& info = track.codecReader->getCodecInfo();
+        if (info.codecID != track.codecID)
+        {
+            track.codecID = info.codecID;
+            track.matroskaCodecID = codecNameToMatroskaID(info.programName, info.codecID);
+        }
+
         if (track.trackType == 1)  // video
         {
             const auto mpegReader = dynamic_cast<MPEGStreamReader*>(track.codecReader);
@@ -837,6 +978,16 @@ void MatroskaMuxer::refreshTrackProperties()
                 track.fps = mpegReader->getFPS();
                 track.interlaced = mpegReader->getInterlaced();
                 track.streamAR = mpegReader->getStreamAR();
+                track.hasColourDesc =
+                    mpegReader->getColourDesc(track.colourPrimaries, track.colourTransfer, track.colourMatrix);
+                // getStreamHDR: 1 SDR, 2 HDR10, 4 Dolby Vision, 16 HDR10+. Everything except
+                // plain SDR carries an HDR10 base layer, so mastering metadata applies.
+                track.isHdr10 = mpegReader->getStreamHDR() != 1;
+                // Dolby Vision configuration, when the stream carries an RPU. Written whatever
+                // the profile, because a single layer profile 8 track is complete on its own; a
+                // profile 7 base layer without its enhancement layer is handled below.
+                if (const auto hevcReader = dynamic_cast<HEVCStreamReader*>(track.codecReader))
+                    track.dvBlockAddIdType = hevcReader->buildDoViConfigRecord(track.dvConfig);
             }
         }
         else if (track.trackType == 2)  // audio
@@ -851,6 +1002,35 @@ void MatroskaMuxer::refreshTrackProperties()
             if (lpcmReader)
                 track.bitDepth = lpcmReader->m_bitsPerSample;
         }
+    }
+
+    // A Dolby Vision configuration record is a promise to the player that THIS track is playable
+    // Dolby Vision. That is true of a single layer track, which carries its base layer and its RPU
+    // together. It is NOT true of the enhancement layer of a dual layer disc: the RPU rides on the
+    // enhancement layer, so it is that track which looks like Dolby Vision here, while the picture
+    // lives on the base layer. Writing the record there produced a quarter resolution track
+    // announcing itself as complete single layer Dolby Vision, which it is not, is not the base
+    // layer, and cannot be played on its own. The reference muxer merges the two layers into ONE
+    // track and describes it as profile 7 with base layer, enhancement layer and RPU all present;
+    // until tsMuxeR can do that merge, the honest output is a plain HDR10 file and no claim at all.
+    //
+    // Only the FIRST video track may carry the record, so a single layer source is unaffected, and
+    // so is a Dolby Vision base layer sitting beside a picture in picture stream. A later video
+    // track carrying an RPU is an enhancement layer by construction.
+    bool videoSeen = false;
+    for (auto& [streamIdx, track] : m_tracks)
+    {
+        if (track.trackType != 1)
+            continue;
+        if (videoSeen && track.dvBlockAddIdType)
+        {
+            LTRACE(LT_INFO, 2,
+                   "Dolby Vision enhancement layer found on a second video track. Matroska needs both "
+                   "layers merged into one track, which is not implemented, so the file is written as "
+                   "HDR10 and no Dolby Vision descriptor is claimed.");
+            track.dvBlockAddIdType = 0;
+        }
+        videoSeen = true;
     }
 }
 
@@ -868,7 +1048,62 @@ void MatroskaMuxer::writeDeferredHeader()
     // Write Tracks
     writeTracks();
 
+    // Chapters must precede the first Cluster, because a player reads the header once and does
+    // not go looking for them later.
+    writeChapters();
+
     m_headerWritten = true;
+}
+
+// A Blu-ray playlist carries a couple of hundred chapter marks and an MKV source carries its own,
+// and until now neither reached Matroska output: the muxer had no chapter support at all, so a
+// remux silently dropped every one of them. The Blu-ray path already turns the same list into
+// playlist marks (BlurayHelper::createMPLSFile).
+void MatroskaMuxer::writeChapters()
+{
+    if (m_chapters.empty())
+        return;
+
+    // ChapterTimeStart is in nanoseconds and is NOT scaled by TimestampScale, unlike block
+    // timestamps, so it must not go through the cluster timestamp conversion.
+    std::vector<uint8_t> atoms;
+    uint64_t uid = 0x1000;
+    for (const double startSec : m_chapters)
+    {
+        if (startSec < 0)
+            continue;
+        uint8_t atom[64];
+        int p = 0;
+        p += ebml_write_uint(atom + p, MATROSKA_ID_CHAPTERUID, ++uid);
+        p += ebml_write_uint(atom + p, MATROSKA_ID_CHAPTERTIMESTART,
+                             static_cast<uint64_t>(startSec * 1000000000.0 + 0.5));
+        p += ebml_write_uint(atom + p, MATROSKA_ID_CHAPTERFLAGHIDDEN, 0);
+
+        uint8_t hdr[16];
+        int h = ebml_write_master_open(hdr, MATROSKA_ID_CHAPTERATOM, p);
+        atoms.insert(atoms.end(), hdr, hdr + h);
+        atoms.insert(atoms.end(), atom, atom + p);
+    }
+    if (atoms.empty())
+        return;
+
+    std::vector<uint8_t> edition;
+    uint8_t ed[32];
+    int e = 0;
+    e += ebml_write_uint(ed + e, MATROSKA_ID_EDITIONUID, 0x0EDU);
+    e += ebml_write_uint(ed + e, MATROSKA_ID_EDITIONFLAGHIDDEN, 0);
+    e += ebml_write_uint(ed + e, MATROSKA_ID_EDITIONFLAGDEFAULT, 1);
+    edition.insert(edition.end(), ed, ed + e);
+    edition.insert(edition.end(), atoms.begin(), atoms.end());
+
+    uint8_t hdr[16];
+    int h = ebml_write_master_open(hdr, MATROSKA_ID_EDITIONENTRY, edition.size());
+    std::vector<uint8_t> chapters(hdr, hdr + h);
+    chapters.insert(chapters.end(), edition.begin(), edition.end());
+
+    h = ebml_write_master_open(hdr, MATROSKA_ID_CHAPTERS, chapters.size());
+    writeToFile(hdr, h);
+    writeToFile(chapters.data(), static_cast<int>(chapters.size()));
 }
 
 void MatroskaMuxer::replayBufferedPackets()

@@ -16,8 +16,13 @@ class HEVCStreamReader final : public MPEGStreamReader
     ~HEVCStreamReader() override;
     int getTSDescriptor(uint8_t* dstBuff, bool blurayMode, bool hdmvDescriptors) override;
     int setDoViDescriptor(uint8_t* dstBuff) const;
+    // Shared derivation behind both the Blu-ray descriptor and the Matroska record.
+    bool getDoViParams(int& profile, int& level, int& compatibility, bool& isDVBLOut) const;
+    // Writes 24 bytes and returns the Matroska BlockAddIDType (dvcC or dvvC), or 0 if not DV.
+    [[nodiscard]] uint32_t buildDoViConfigRecord(uint8_t* dst) const;
     CheckStreamRez checkStream(uint8_t* buffer, int len);
     void applyDiscoveryData(const StreamDiscoveryData& data) override;
+    void fillVideoDiscoveryData(StreamDiscoveryData& data) override;
     [[nodiscard]] bool needSPSForSplit() const override { return false; }
 
    protected:
@@ -28,6 +33,7 @@ class HEVCStreamReader final : public MPEGStreamReader
     [[nodiscard]] unsigned getStreamWidth() const override;
     [[nodiscard]] unsigned getStreamHeight() const override;
     [[nodiscard]] int getStreamHDR() const override;
+    [[nodiscard]] bool getColourDesc(uint8_t& primaries, uint8_t& transfer, uint8_t& matrix) const override;
     bool getInterlaced() override { return false; }
     bool isIFrame() override { return m_lastIFrame; }
 

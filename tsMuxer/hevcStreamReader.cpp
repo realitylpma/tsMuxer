@@ -48,6 +48,26 @@ void HEVCStreamReader::applyDiscoveryData(const StreamDiscoveryData& data)
 {
     if (data.fps > 0.0 && m_fps == 0.0)
         setFPS(data.fps);
+    // Restore what the probe found. Only ever turn these ON: the probe saw more of the stream
+    // than the muxer has by header-writing time, so its answer is the better one, but a flag the
+    // muxer has already set for itself must not be cleared.
+    if (m_hdr)
+    {
+        if (data.isDVRPU)
+            m_hdr->isDVRPU = true;
+        if (data.isDVEL)
+            m_hdr->isDVEL = true;
+    }
+}
+
+void HEVCStreamReader::fillVideoDiscoveryData(StreamDiscoveryData& data)
+{
+    MPEGStreamReader::fillVideoDiscoveryData(data);
+    if (m_hdr)
+    {
+        data.isDVRPU = m_hdr->isDVRPU;
+        data.isDVEL = m_hdr->isDVEL;
+    }
 }
 
 CheckStreamRez HEVCStreamReader::checkStream(uint8_t* buffer, const int len)
@@ -278,14 +298,26 @@ int HEVCStreamReader::getTSDescriptor(uint8_t* dstBuff, const bool blurayMode, c
     return (hdmvDescriptors ? 10 : 15) + lenDoviDesc;
 }
 
-int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
+// Split out of setDoViDescriptor so the same derivation can also build the Matroska Dolby Vision
+// configuration record, which wants exactly these fields in a different container. Behaviour of
+// the Blu-ray descriptor is unchanged; it just calls this first.
+bool HEVCStreamReader::getDoViParams(int& profile, int& level, int& compatibility, bool& isDVBLOut) const
 {
+    if (!m_sps || !m_hdr)
+        return false;
     const bool isDVBL = (V3_flags & BL_TRACK) == 0;
+    isDVBLOut = isDVBL;
     if (!isDVBL)
         m_hdr->isDVEL = true;
 
     unsigned width = getStreamWidth();
-    auto pixelRate = static_cast<uint32_t>(width * getStreamHeight() * getFPS());
+    // The Dolby level thresholds are defined AS exact rates, e.g. 199065600 is precisely
+    // 3840 x 2160 x 24. getFPS() carries a little floating point noise, 24 arrives as
+    // 24.0000004, and a UHD 24p stream then computed 199065603, three over the boundary, and was
+    // declared level 7 instead of 6. Rounding the frame rate to a thousandth removes the noise
+    // without disturbing any real rate: 23.976 and 29.97 keep their exact values.
+    const double fps = std::round(getFPS() * 1000.0) / 1000.0;
+    auto pixelRate = static_cast<uint32_t>(width * getStreamHeight() * fps);
 
     if (!isDVBL && V3_flags & FOUR_K)
     {
@@ -296,9 +328,6 @@ int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
     // cf. "http://www.dolby.com/us/en/technologies/dolby-vision/dolby-vision-profiles-levels.pdf"
     // "For profiles 7, 8.1 and 8.4, VUI parameters are required, as bitstreams employing these profiles
     // have a non-SDR base layer. For other Dolby Vision profiles, VUI parameters are optional."
-    int profile;
-    int compatibility;
-
     if (m_sps->bit_depth_luma_minus8 == 2)  // 10-bit
     {
         if (m_hdr->isDVEL)
@@ -360,7 +389,7 @@ int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
         }
     }
 
-    int level = 0;
+    level = 0;
     if (width <= 1280 && pixelRate <= 22118400)
         level = 1;
     else if (width <= 1280 && pixelRate <= 27648000)
@@ -387,6 +416,49 @@ int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
         level = 12;
     else if (width <= 7680 && pixelRate <= 3981312000)
         level = 13;
+
+    return true;
+}
+
+// The Matroska Dolby Vision configuration record: dvcC for profiles up to 7, dvvC above. 24
+// bytes, the same profile / level / flags the Blu-ray descriptor carries, then reserved zeroes.
+// Returns the block addition ID type (the fourcc as a uint) or 0 when the stream is not DV.
+uint32_t HEVCStreamReader::buildDoViConfigRecord(uint8_t* dst) const
+{
+    if (!m_hdr || (!m_hdr->isDVRPU && !m_hdr->isDVEL))
+        return 0;
+    int profile = 0;
+    int level = 0;
+    int compatibility = 0;
+    bool isDVBL = false;
+    if (!getDoViParams(profile, level, compatibility, isDVBL))
+        return 0;
+
+    memset(dst, 0, 24);
+    BitStreamWriter w{};
+    w.setBuffer(dst, dst + 24);
+    w.putBits(8, 1);  // dv_version_major
+    w.putBits(8, 0);  // dv_version_minor
+    w.putBits(7, profile);
+    w.putBits(6, level);
+    w.putBits(1, m_hdr->isDVRPU);  // rpu_present_flag
+    w.putBits(1, m_hdr->isDVEL);   // el_present_flag
+    w.putBits(1, 1);               // bl_present_flag: the base layer is always in the merged track
+    w.putBits(4, compatibility);   // dv_bl_signal_compatibility_id
+    w.putBits(28, 0);              // reserved
+    w.flushBits();
+
+    return profile > 7 ? 0x64767643 /* dvvC */ : 0x64766343 /* dvcC */;
+}
+
+int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
+{
+    int profile = 0;
+    int level = 0;
+    int compatibility = 0;
+    bool isDVBL = false;
+    if (!getDoViParams(profile, level, compatibility, isDVBL))
+        return 0;
 
     BitStreamWriter bitWriter{};
     bitWriter.setBuffer(dstBuff, dstBuff + 128);
@@ -439,9 +511,31 @@ void HEVCStreamReader::updateStreamFps(void* nalUnit, uint8_t* buff, uint8_t* ne
     memcpy(buff, tmpBuffer.get(), newSpsLen);
 }
 
-unsigned HEVCStreamReader::getStreamWidth() const { return m_sps ? m_sps->pic_width_in_luma_samples : 0; }
+// Both return the DISPLAYED size, i.e. the coded size minus the conformance window, which is what
+// H.264 has always done (nalUnits.h subtracts getCropX()/getCropY()). HEVC used to return the raw
+// coded size, so a stream whose encoder padded 2160 lines up to 2176 was reported, and written
+// into Matroska, as 16 lines taller than the picture actually is. Every consumer wants the
+// displayed size: the Matroska track header, the aspect ratio derived in
+// MPEGStreamReader::fillDiscoveryData, and the Dolby Vision level's pixel rate. The Blu-ray
+// video_format is chosen from the WIDTH for anything above SD, so it is unaffected.
+//
+// Offsets are in chroma units, hence the subsampling factors.
+unsigned HEVCStreamReader::getStreamWidth() const { return m_sps ? m_sps->getDisplayWidth() : 0; }
 
-unsigned HEVCStreamReader::getStreamHeight() const { return m_sps ? m_sps->pic_height_in_luma_samples : 0; }
+unsigned HEVCStreamReader::getStreamHeight() const { return m_sps ? m_sps->getDisplayHeight() : 0; }
+
+// The SPS VUI fields default to 2, "unspecified", and are only overwritten when the stream
+// actually carries a colour_description_present_flag. So all-2 means the stream said nothing and
+// there is nothing worth declaring in the container.
+bool HEVCStreamReader::getColourDesc(uint8_t& primaries, uint8_t& transfer, uint8_t& matrix) const
+{
+    if (!m_sps)
+        return false;
+    primaries = m_sps->colour_primaries;
+    transfer = m_sps->transfer_characteristics;
+    matrix = m_sps->matrix_coeffs;
+    return primaries != 2 || transfer != 2 || matrix != 2;
+}
 
 int HEVCStreamReader::getStreamHDR() const
 {

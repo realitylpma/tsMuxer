@@ -27,9 +27,24 @@ class TSDemuxer final : public AbstractDemuxer
     void setFileIterator(FileNameIterator* itr) override;
     int64_t getTrackDelay(const int32_t pid) override
     {
+        // Track delay must be measured against the FIRST timestamp seen for each PID, not the
+        // smallest one. m_firstVideoPTS / m_firstPtsTime are running minima (they are used
+        // elsewhere to measure the presented span of a clip), so on an open-GOP stream whose
+        // leading B pictures are presented before the first coded picture they report the
+        // display start instead of the stream's anchor. The muxer anchors every track on its
+        // first coded unit, so the delay written here has to use the same reference or the
+        // reorder lead-in is silently dropped on demux/remux.
+        //
+        // Found on AVCHD .MTS clips from a Sony ZV-1, which writes its audio 80 ms ahead of the
+        // video and opens with two leading B pictures: the minimum video PTS then equals the
+        // audio's first PTS, the delay computes as 0, and a zero is not reported at all, so the
+        // offset was silently lost on a demux and remux. Clips from a Panasonic Lumix DMC-TZ110
+        // do not reproduce it, because their first coded picture is also their first displayed
+        // one. Nothing here is specific to AVCHD; that is only where it was noticed.
         if (m_firstPtsTime.find(pid) != m_firstPtsTime.end())
         {
-            const int64_t clockTicks = m_firstPtsTime[pid] - (m_firstVideoPTS != -1 ? m_firstVideoPTS : m_firstPTS);
+            const int64_t clockTicks =
+                m_firstPtsTime[pid] - (m_firstSeenVideoPTS != -1 ? m_firstSeenVideoPTS : m_firstSeenPTS);
             return llround(static_cast<double>(clockTicks) / 90.0);  // convert to ms
         }
 
@@ -52,7 +67,7 @@ class TSDemuxer final : public AbstractDemuxer
     std::string m_streamNameLow;
     std::map<int, int64_t> m_lastPesPts;
     std::map<int, int64_t> m_lastPesDts;
-    std::map<int, int64_t> m_firstPtsTime;
+    std::map<int, int64_t> m_firstPtsTime;  // first PTS per PID, in file order (never a minimum)
     std::map<int, int64_t> m_firstDtsTime;
     std::map<int, int64_t> m_fullPtsTime;
     std::map<int, int64_t> m_fullDtsTime;
@@ -70,10 +85,12 @@ class TSDemuxer final : public AbstractDemuxer
     int64_t m_tmpBufferLen;
     // int64_t m_firstDTS;
     int64_t m_firstPTS;
+    int64_t m_firstSeenPTS;  // first PTS seen on any PID, in file order (never a minimum)
     int64_t m_lastPTS;
     int64_t m_prevFileLen;
     uint32_t m_curFileNum;
     int64_t m_firstVideoPTS;
+    int64_t m_firstSeenVideoPTS;  // first PTS seen on a video PID, in file order (never a minimum)
     int64_t m_lastVideoPTS;
     int64_t m_lastVideoDTS;
     int64_t m_videoDtsGap;

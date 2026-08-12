@@ -118,6 +118,7 @@ TSMuxer::TSMuxer(MuxerManager* owner) : AbstractMuxer(owner)
     m_outBufLen = 0;
     m_pesData.reserve(1024 * 128);
     m_mainStreamIndex = -1;
+    m_mainStreamRank = 0;
     m_muxFile = nullptr;
     m_isExternalFile = false;
     m_writeBlockSize = 0;
@@ -170,16 +171,45 @@ void TSMuxer::intAddStream(const std::string& streamName, const std::string& cod
     if (codecReader != nullptr)
         descriptorLen = codecReader->getTSDescriptor(descrBuffer, m_bluRayMode, m_hdmvDescriptors);
 
-    if (codecName[0] == 'V' || (codecName[0] == 'A' && m_mainStreamIndex == -1))
+    // Which stream is the main one settles the split points, the interleaving and, until this was
+    // fixed, the entire title length. The original test was unguarded for video, so the LAST video
+    // track added won it, and since only the main stream advanced the running duration the playlist
+    // ended up describing whichever video the meta happened to list last. A second video track that
+    // is legitimately shorter than the feature, a picture in picture stream or a Dolby Vision
+    // enhancement layer, therefore produced a disc that a player ended early even though the feature
+    // had been written in full, and every chapter mark past that point was dropped as out of range.
+    //
+    // Ordering is the wrong thing to key on in either direction, so the choice is made from what the
+    // track IS. The classification is the one the PID assignment below already makes: a primary
+    // video is neither secondary nor a Dolby Vision enhancement layer, which is exactly the track
+    // that gets PID 0x1011. It outranks any other video, which outranks audio, and a higher rank
+    // never loses to a lower one whatever order the meta lists them in.
+    const bool isVideo = codecName[0] == 'V';
+    const bool isSecondary = codecReader != nullptr && codecReader->isSecondary();
+    const bool isDvEnhancement = codecReader != nullptr && codecReader->getStreamHDR() == 4;
+    const bool isPrimaryVideo = isVideo && !isSecondary && !isDvEnhancement;
+
+    const int rank = isPrimaryVideo ? 3 : (isVideo ? 2 : (codecName[0] == 'A' ? 1 : 0));
+    if (rank > m_mainStreamRank)
+    {
+        m_mainStreamRank = rank;
         m_mainStreamIndex = streamIndex;
+    }
 
     string lang;
     auto itr = params.find("lang");
     if (itr != params.end())
         lang = itr->second;
+    else if (const auto src = params.find("srclang"); src != params.end())
+    {
+        // Carried over from the source container by muxerManager when the meta gave no lang=.
+        // language_code is a mandatory fixed 3 byte field in the STN stream attributes
+        // (tsPacket.cpp), so leaving it blank is the deviation, not filling it: a player then
+        // shows an unnamed audio track. Video has no such field and is unaffected.
+        lang = src->second;
+    }
 
     int tsStreamIndex = streamIndex + 16;
-    const bool isSecondary = codecReader != nullptr ? codecReader->isSecondary() : false;
 
     if (codecName[0] == 'V')
     {
@@ -430,6 +460,7 @@ void TSMuxer::intAddStream(const std::string& streamName, const std::string& cod
     // cache the downcasts once per stream; muxPacket and writePESPacket run per
     // AVPacket/PES and previously paid a dynamic_cast each time
     m_streamInfo[tsStreamIndex].m_mpegReader = dynamic_cast<MPEGStreamReader*>(codecReader);
+    m_streamInfo[tsStreamIndex].m_definesDuration = isPrimaryVideo;
     const auto itPid = m_pmt.pidList.find(tsStreamIndex);
     if (itPid != m_pmt.pidList.end())
     {
@@ -1230,7 +1261,16 @@ bool TSMuxer::muxPacket(AVPacket& avPacket)
     {
         if (streamInfo.m_mpegReader)
             m_additionCLPISize = static_cast<int64_t>(INTERNAL_PTS_FREQ / streamInfo.m_mpegReader->getFPS());
+    }
 
+    // A title runs as long as its primary video does, whichever stream that turns out to be and
+    // whatever order the meta listed them in. Measuring only the main stream truncated the playlist
+    // to the shorter of two video tracks; measuring the longest of every stream would let a trailing
+    // audio or subtitle block stretch a title past its last picture. The main stream is still read
+    // here so an audio only mux, which has no primary video at all, keeps the length it always had.
+    // With a single video track, which is every ordinary mux, this is the same stream as before.
+    if (streamInfo.m_definesDuration || avPacket.stream_index == m_mainStreamIndex)
+    {
         if (avPacket.duration > 0)
             *m_lastPts.rbegin() = FFMAX(*m_lastPts.rbegin(), avPacket.pts + avPacket.duration);
         else

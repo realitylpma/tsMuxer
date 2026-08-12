@@ -176,6 +176,10 @@ class METADemuxer final : public AbstractDemuxer
     ~METADemuxer() override;
     int readPacket(AVPacket& avPacket);
     void readClose() override;
+
+    // Chapters of the first source container that has any. DetectStreamRez::chapters holds the
+    // same information but only on the listing path, so the mux path had no way to reach it.
+    [[nodiscard]] std::vector<AVChapter> getChapters() override;
     int64_t getDemuxedSize() override;
     int addStream(const std::string& codec, const std::string& codecStreamName,
                   const std::map<std::string, std::string>& addParams);
