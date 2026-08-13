@@ -23,6 +23,10 @@ struct StreamDiscoveryData
     int channels = 0;
     int bitsPerSample = 0;
     int bitrate = 0;
+    // True when an AC-3 track turned out to be TrueHD, i.e. an AC-3 core with a lossless MLP
+    // substream behind it. Carried here for the same reason as the Dolby Vision flags below: it is
+    // discovered while probing, with test mode on, and is NOT otherwise re-derived during muxing.
+    bool isTrueHD = false;
 
     // Video properties (filled for video codecs)
     int width = 0;

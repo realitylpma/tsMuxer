@@ -19,6 +19,7 @@ class AC3StreamReader final : public SimplePacketizerReader, public AC3Codec
         m_demuxedTHDSamples = 0;
         m_totalTHDSamples = 0;
         m_nextAc3Time = 0;
+        m_needTrueHDProbe = false;
     }
     int getTSDescriptor(uint8_t* dstBuff, bool blurayMode, bool hdmvDescriptors) override;
     void setNewStyleAudioPES(const bool value) { m_useNewStyleAudioPES = value; }
@@ -37,6 +38,12 @@ class AC3StreamReader final : public SimplePacketizerReader, public AC3Codec
     bool isPriorityData(AVPacket* packet) override;
     bool isIFrame(AVPacket* packet) override { return isPriorityData(packet); }
     bool isSecondary() override;
+
+   private:
+    // Find the lossless substream on THIS reader. Only runs for a track the discovery phase already
+    // identified as TrueHD, and only once.
+    void probeTrueHD();
+    bool m_needTrueHDProbe;
 
    protected:
     int getHeaderLen() override { return AC3Codec::getHeaderLen(); }

@@ -137,6 +137,7 @@ class MatroskaMuxer final : public AbstractMuxer
         int64_t pendingPts;
         uint8_t pendingFlags;
         bool hasPendingFrame;
+        bool anyBlockWritten;  // used to spot the leading AC-3 core frame of a TrueHD track
 
         MkvTrackInfo()
             : streamIndex(0),
@@ -169,7 +170,8 @@ class MatroskaMuxer final : public AbstractMuxer
               bitDepth(0),
               pendingPts(0),
               pendingFlags(0),
-              hasPendingFrame(false)
+              hasPendingFrame(false),
+              anyBlockWritten(false)
         {
         }
     };

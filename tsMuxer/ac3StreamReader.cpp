@@ -12,6 +12,7 @@ void AC3StreamReader::fillDiscoveryData(StreamDiscoveryData& data)
 {
     SimplePacketizerReader::fillDiscoveryData(data);  // sampleRate, channels
     data.bitrate = m_bit_rate;
+    data.isTrueHD = m_true_hd_mode;
 }
 
 void AC3StreamReader::applyDiscoveryData(const StreamDiscoveryData& data)
@@ -22,6 +23,53 @@ void AC3StreamReader::applyDiscoveryData(const StreamDiscoveryData& data)
         m_channels = static_cast<uint8_t>(data.channels);
     if (data.bitrate > 0)
         m_bit_rate = data.bitrate;
+    // A TrueHD track is an AC-3 core with a lossless substream behind it, and the reader only ever
+    // finds that out while PROBING, because the detection at ac3Codec.cpp is gated on test mode.
+    // The instance that does the muxing is a different one, and it re-ran that probe only on the
+    // Blu-ray path, inside getTSDescriptor. On every other output it stayed in plain AC-3 mode:
+    // each lossless frame failed to parse, was reported as a bad frame and resynced past, so the
+    // result was the 448 kbps core alone, labelled AC-3, with no warning and a successful mux.
+    // Carrying the flag here is what the Dolby Vision flags already do for the same reason.
+    //
+    // What is carried is a REQUEST TO LOOK, not the answer. Setting m_true_hd_mode directly gives a
+    // reader that believes it is TrueHD while its MLP sub-codec is still empty: the stream then
+    // reports "AC3 core + UNKNOWN" at 0 KHz, and the frame timing divides by a sample rate of zero.
+    // The flag only says the probe found a lossless substream, so this reader should go and find it
+    // too. Only ever turned ON, so a reader that has already worked it out is left alone.
+    if (data.isTrueHD && !m_true_hd_mode)
+        m_needTrueHDProbe = true;
+}
+
+// Establish TrueHD mode on THIS reader, the same way the Blu-ray path does inside getTSDescriptor.
+//
+// TrueHD detection at ac3Codec.cpp is gated on test mode, which is only ever on while probing, so a
+// reader that never probes stays in plain AC-3 mode forever. Deliberately kept to tracks the
+// discovery phase already identified as TrueHD, so no plain AC-3 track on any path is touched.
+void AC3StreamReader::probeTrueHD()
+{
+    if (m_true_hd_mode || m_buffer == nullptr || m_buffer >= m_bufEnd)
+        return;
+
+    AC3Codec::setTestMode(true);
+    uint8_t* frame = findFrame(m_buffer, m_bufEnd);
+    for (int i = 0; i < 2 && frame != nullptr && frame < m_bufEnd;)
+    {
+        int skipBytes = 0;
+        int skipBeforeBytes = 0;
+        const int len = decodeFrame(frame, m_bufEnd, skipBytes, skipBeforeBytes);
+        if (len < 1)
+            break;
+        frame += len + skipBytes;
+        if (getFrameDuration() > 0)
+            i++;
+    }
+    m_state = AC3State::stateDecodeAC3;
+    AC3Codec::setTestMode(false);
+
+    if (m_true_hd_mode)
+        LTRACE(
+            LT_INFO, 2,
+            "TrueHD track (track " << m_streamIndex << "): the lossless substream is carried through to the output.");
 }
 
 bool AC3StreamReader::isPriorityData(AVPacket* packet)
@@ -151,6 +199,11 @@ int AC3StreamReader::getTSDescriptor(uint8_t* dstBuff, bool blurayMode, bool hdm
 
 int AC3StreamReader::readPacket(AVPacket& avPacket)
 {
+    if (m_needTrueHDProbe)
+    {
+        m_needTrueHDProbe = false;
+        probeTrueHD();
+    }
     if (m_true_hd_mode && !m_downconvertToAC3)
         return readPacketTHD(avPacket);
     return SimplePacketizerReader::readPacket(avPacket);

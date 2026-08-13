@@ -1586,6 +1586,7 @@ void MatroskaMuxer::writeBlock(MkvTrackInfo& track, const uint8_t* frameData, in
 
     m_clusterBuf.insert(m_clusterBuf.end(), frameData, frameData + frameSize);
     m_clusterDataSize += hdrLen + blockPayloadSize;
+    track.anyBlockWritten = true;
 }
 
 // Emit held base layer frames whose enhancement layer access unit has arrived complete.
@@ -1697,6 +1698,29 @@ bool MatroskaMuxer::muxPacketInternal(AVPacket& avPacket)
         return true;
 
     MkvTrackInfo& track = it->second;
+
+    // A TrueHD track arrives as its lossless frames PLUS the AC-3 core frames, because a disc has
+    // to carry both beside each other on one PID for a player that cannot decode the lossless
+    // stream. Matroska has no such arrangement: an A_TRUEHD track holds the lossless stream alone,
+    // and an AC-3 frame sitting inside one is something a player will hand to an MLP decoder. Drop
+    // the core, which is what the reference muxers do and what a Matroska player expects.
+    if (track.matroskaCodecID == MATROSKA_CODEC_ID_AUDIO_TRUEHD)
+    {
+        // Two core frames arrive WITHOUT the flag: the first one, before the reader's state machine
+        // has classified the stream, and the last one, which end of stream flushing hands over
+        // directly. Position is not a safe test for either, so the packet is asked what it is.
+        //
+        // An MLP frame states its own length in its first two bytes, as a count of 16 bit words, so
+        // a genuine lossless frame's length field matches its size. An AC-3 frame read the same way
+        // claims something else entirely: the 351 byte core frame at the end of a stream reads as
+        // 5870 bytes. So a packet is treated as the core only when it carries the AC-3 sync word
+        // AND fails to describe itself as MLP, which no real lossless frame can do.
+        const int mlpLength = avPacket.size >= 2 ? ((((avPacket.data[0] & 0x0F) << 8) | avPacket.data[1]) * 2) : 0;
+        const bool isAc3Core =
+            avPacket.size >= 2 && avPacket.data[0] == 0x0B && avPacket.data[1] == 0x77 && mlpLength != avPacket.size;
+        if ((avPacket.flags & AVPacket::IS_CORE_PACKET) || isAc3Core)
+            return true;
+    }
 
     // A folded Dolby Vision enhancement layer writes no block of its own. Its bytes are collected
     // on the base track, one access unit at a time, and appended to the matching base layer frame.
