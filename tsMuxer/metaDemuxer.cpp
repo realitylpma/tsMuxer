@@ -21,6 +21,7 @@ static bool isKnownTrackParam(const std::string& name);
 #include "dvbSubStreamReader.h"
 #include "flacStreamReader.h"
 #include "h264StreamReader.h"
+#include "hevcDolbyVisionFilter.h"
 #include "hevcStreamReader.h"
 #include "lpcmStreamReader.h"
 #include "matroskaDemuxer.h"
@@ -2011,6 +2012,10 @@ bool ContainerToReaderWrapper::openStream(int readerID, const char* streamName, 
         {
             if (codecInfo->codecID == CODEC_V_MPEG4_H264 || codecInfo->codecID == CODEC_V_MPEG4_H264_DEP)
                 demuxer->setPidFilter(srcPID, new CombinedH264Filter(srcPID));
+            else if (codecInfo->codecID == CODEC_V_MPEG4_H265)
+                // A merged dual layer Dolby Vision track, split back into base layer and
+                // enhancement layer. subTrack=1 is the base layer, subTrack=2 the enhancement.
+                demuxer->setPidFilter(srcPID, new HevcDolbyVisionFilter(srcPID));
             else
                 THROW(ERR_INVALID_CODEC_FORMAT, "Unsupported parameter subTrack for codec " << codecInfo->displayName)
         }
