@@ -303,36 +303,20 @@ int HEVCStreamReader::getTSDescriptor(uint8_t* dstBuff, const bool blurayMode, c
 // Split out of setDoViDescriptor so the same derivation can also build the Matroska Dolby Vision
 // configuration record, which wants exactly these fields in a different container. Behaviour of
 // the Blu-ray descriptor is unchanged; it just calls this first.
-bool HEVCStreamReader::getDoViParams(int& profile, int& level, int& compatibility, bool& isDVBLOut) const
+// The profile and compatibility table, lifted out of getDoViParams UNCHANGED so that the Matroska
+// dual layer record can consult the same one table instead of carrying a second copy that would
+// drift. The only edit is that the enhancement layer question is now an argument rather than
+// m_hdr->isDVEL, because a merged Matroska track has to be described from the ENHANCEMENT layer's
+// stream while its picture geometry comes from the base layer.
+void HEVCStreamReader::doViProfileAndCompatibility(const bool isEnhancementLayer, int& profile,
+                                                   int& compatibility) const
 {
-    if (!m_sps || !m_hdr)
-        return false;
-    const bool isDVBL = (V3_flags & BL_TRACK) == 0;
-    isDVBLOut = isDVBL;
-    if (!isDVBL)
-        m_hdr->isDVEL = true;
-
-    unsigned width = getStreamWidth();
-    // The Dolby level thresholds are defined AS exact rates, e.g. 199065600 is precisely
-    // 3840 x 2160 x 24. getFPS() carries a little floating point noise, 24 arrives as
-    // 24.0000004, and a UHD 24p stream then computed 199065603, three over the boundary, and was
-    // declared level 7 instead of 6. Rounding the frame rate to a thousandth removes the noise
-    // without disturbing any real rate: 23.976 and 29.97 keep their exact values.
-    const double fps = std::round(getFPS() * 1000.0) / 1000.0;
-    auto pixelRate = static_cast<uint32_t>(width * getStreamHeight() * fps);
-
-    if (!isDVBL && V3_flags & FOUR_K)
-    {
-        width *= 2;
-        pixelRate *= 4;
-    }
-
     // cf. "http://www.dolby.com/us/en/technologies/dolby-vision/dolby-vision-profiles-levels.pdf"
     // "For profiles 7, 8.1 and 8.4, VUI parameters are required, as bitstreams employing these profiles
     // have a non-SDR base layer. For other Dolby Vision profiles, VUI parameters are optional."
     if (m_sps->bit_depth_luma_minus8 == 2)  // 10-bit
     {
-        if (m_hdr->isDVEL)
+        if (isEnhancementLayer)
         {
             if (m_sps->transfer_characteristics == 16)  // PQ
             {
@@ -390,8 +374,13 @@ bool HEVCStreamReader::getDoViParams(int& profile, int& level, int& compatibilit
             compatibility = 0;
         }
     }
+}
 
-    level = 0;
+// The Dolby level ladder, also lifted out unchanged. A pure function of picture width and pixel
+// rate, so it can be asked about the BASE layer's geometry from anywhere.
+int HEVCStreamReader::doViLevelFor(const unsigned width, const uint32_t pixelRate)
+{
+    int level = 0;
     if (width <= 1280 && pixelRate <= 22118400)
         level = 1;
     else if (width <= 1280 && pixelRate <= 27648000)
@@ -418,6 +407,41 @@ bool HEVCStreamReader::getDoViParams(int& profile, int& level, int& compatibilit
         level = 12;
     else if (width <= 7680 && pixelRate <= 3981312000)
         level = 13;
+    return level;
+}
+
+// The picture rate this stream's own geometry implies, in the units the level ladder uses.
+uint32_t HEVCStreamReader::doViPixelRate() const
+{
+    // The Dolby level thresholds are defined AS exact rates, e.g. 199065600 is precisely
+    // 3840 x 2160 x 24. getFPS() carries a little floating point noise, 24 arrives as
+    // 24.0000004, and a UHD 24p stream then computed 199065603, three over the boundary, and was
+    // declared level 7 instead of 6. Rounding the frame rate to a thousandth removes the noise
+    // without disturbing any real rate: 23.976 and 29.97 keep their exact values.
+    const double fps = std::round(getFPS() * 1000.0) / 1000.0;
+    return static_cast<uint32_t>(getStreamWidth() * getStreamHeight() * fps);
+}
+
+bool HEVCStreamReader::getDoViParams(int& profile, int& level, int& compatibility, bool& isDVBLOut) const
+{
+    if (!m_sps || !m_hdr)
+        return false;
+    const bool isDVBL = (V3_flags & BL_TRACK) == 0;
+    isDVBLOut = isDVBL;
+    if (!isDVBL)
+        m_hdr->isDVEL = true;
+
+    unsigned width = getStreamWidth();
+    auto pixelRate = doViPixelRate();
+
+    if (!isDVBL && V3_flags & FOUR_K)
+    {
+        width *= 2;
+        pixelRate *= 4;
+    }
+
+    doViProfileAndCompatibility(m_hdr->isDVEL, profile, compatibility);
+    level = doViLevelFor(width, pixelRate);
 
     return true;
 }
@@ -448,6 +472,44 @@ uint32_t HEVCStreamReader::buildDoViConfigRecord(uint8_t* dst) const
     w.putBits(1, 1);               // bl_present_flag: the base layer is always in the merged track
     w.putBits(4, compatibility);   // dv_bl_signal_compatibility_id
     w.putBits(28, 0);              // reserved
+    w.flushBits();
+
+    return profile > 7 ? 0x64767643 /* dvvC */ : 0x64766343 /* dvcC */;
+}
+
+// The record for a MERGED dual layer track, where the base layer and the enhancement layer share
+// one Matroska track. Called on the BASE layer reader, with the enhancement layer's reader.
+//
+// Deliberately NOT routed through getDoViParams, and that is the whole point of it existing: that
+// function decides "am I an enhancement layer" from the process global V3_flags & BL_TRACK, which
+// the Blu-ray muxer sets and the Matroska path never does. Asked here it answered profile 8,
+// level 3, el_present 0 for a profile 7 dual layer disc, a record wrong in three ways at once.
+// Everything below is instead stated from what is genuinely known at this point:
+//     profile and compatibility   from the ENHANCEMENT layer's SPS, which is what makes it dual
+//     level                       from the BASE layer's geometry, because that is the picture
+//     bl / el / rpu present       all 1, because by construction all three are in this one track
+uint32_t HEVCStreamReader::buildDoViConfigRecordDualLayer(uint8_t* dst, const HEVCStreamReader& el) const
+{
+    if (m_sps == nullptr || el.m_sps == nullptr)
+        return 0;
+
+    int profile = 0;
+    int compatibility = 0;
+    el.doViProfileAndCompatibility(true, profile, compatibility);
+    const int level = doViLevelFor(getStreamWidth(), doViPixelRate());
+
+    memset(dst, 0, 24);
+    BitStreamWriter w{};
+    w.setBuffer(dst, dst + 24);
+    w.putBits(8, 1);  // dv_version_major
+    w.putBits(8, 0);  // dv_version_minor
+    w.putBits(7, profile);
+    w.putBits(6, level);
+    w.putBits(1, 1);              // rpu_present_flag
+    w.putBits(1, 1);              // el_present_flag
+    w.putBits(1, 1);              // bl_present_flag
+    w.putBits(4, compatibility);  // dv_bl_signal_compatibility_id
+    w.putBits(28, 0);             // reserved
     w.flushBits();
 
     return profile > 7 ? 0x64767643 /* dvvC */ : 0x64766343 /* dvcC */;

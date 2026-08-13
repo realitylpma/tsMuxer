@@ -754,8 +754,9 @@ std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
 {
     // Build inner content of the TrackEntry.
     // Size the buffer dynamically: fixed fields + colour and mastering metadata (~130 bytes on
-    // its own, eight 64 bit floats among them) + codec private data.
-    const size_t bufSize = 1024 + track.codecPrivate.size();
+    // its own, eight 64 bit floats among them) + codec private data + the enhancement layer's
+    // configuration record, which is another one of comparable size on a dual layer track.
+    const size_t bufSize = 1024 + track.codecPrivate.size() + track.dvElConfig.size();
     std::vector<uint8_t> inner(bufSize);
     int pos = 0;
 
@@ -859,6 +860,22 @@ std::vector<uint8_t> MatroskaMuxer::buildTrackEntry(const MkvTrackInfo& track)
             pos += ebml_write_master_open(inner.data() + pos, MATROSKA_ID_BLOCKADDITIONMAPPING, b);
             memcpy(inner.data() + pos, body, b);
             pos += b;
+
+            // Dual layer: a second mapping, "hvcE", carrying the enhancement layer's own HEVC
+            // configuration record. The Dolby Vision record above says an enhancement layer is
+            // present; this one says how to decode it.
+            if (!track.dvElConfig.empty())
+            {
+                std::vector<uint8_t> body2(64 + track.dvElConfig.size());
+                int b2 = 0;
+                b2 += ebml_write_uint(body2.data() + b2, MATROSKA_ID_BLOCKADDIDVALUE, 1);
+                b2 += ebml_write_uint(body2.data() + b2, MATROSKA_ID_BLOCKADDIDTYPE, 0x68766345 /* hvcE */);
+                b2 += ebml_write_binary(body2.data() + b2, MATROSKA_ID_BLOCKADDIDEXTRADATA, track.dvElConfig.data(),
+                                        static_cast<int>(track.dvElConfig.size()));
+                pos += ebml_write_master_open(inner.data() + pos, MATROSKA_ID_BLOCKADDITIONMAPPING, b2);
+                memcpy(inner.data() + pos, body2.data(), b2);
+                pos += b2;
+            }
         }
     }
 
@@ -890,6 +907,10 @@ void MatroskaMuxer::writeTracks()
     std::vector<uint8_t> allEntries;
     for (auto& [streamIdx, track] : m_tracks)
     {
+        // A Dolby Vision enhancement layer folded into its base track is not a track of its own.
+        if (track.dvMergedIntoStream >= 0)
+            continue;
+
         std::vector<uint8_t> entryContent = buildTrackEntry(track);
 
         // Write TrackEntry master header + content
@@ -1010,28 +1031,61 @@ void MatroskaMuxer::refreshTrackProperties()
     // enhancement layer, so it is that track which looks like Dolby Vision here, while the picture
     // lives on the base layer. Writing the record there produced a quarter resolution track
     // announcing itself as complete single layer Dolby Vision, which it is not, is not the base
-    // layer, and cannot be played on its own. The reference muxer merges the two layers into ONE
-    // track and describes it as profile 7 with base layer, enhancement layer and RPU all present;
-    // until tsMuxeR can do that merge, the honest output is a plain HDR10 file and no claim at all.
+    // layer, and cannot be played on its own.
     //
-    // Only the FIRST video track may carry the record, so a single layer source is unaffected, and
-    // so is a Dolby Vision base layer sitting beside a picture in picture stream. A later video
-    // track carrying an RPU is an enhancement layer by construction.
-    bool videoSeen = false;
+    // Matroska carries a dual layer title as ONE track with both layers interleaved, so that is
+    // what is built here: the enhancement layer is folded into the base track, gets no track entry
+    // of its own, and the merged track is described as profile 7 with base layer, enhancement layer
+    // and RPU all present.
+    //
+    // The pairing is keyed on "a video track after the first one that carries an RPU", NOT on "has
+    // an RPU", because an RPU means CARRIES DOLBY VISION DATA and not IS AN ENHANCEMENT LAYER: a
+    // single layer profile 8 track has one too and must be left alone. A Dolby Vision base layer
+    // sitting beside a picture in picture stream also stays untouched, because a picture in picture
+    // stream carries no RPU.
+    MkvTrackInfo* baseTrack = nullptr;
     for (auto& [streamIdx, track] : m_tracks)
     {
         if (track.trackType != 1)
             continue;
-        if (videoSeen && track.dvBlockAddIdType)
+        if (baseTrack == nullptr)
         {
-            LTRACE(LT_INFO, 2,
-                   "Dolby Vision enhancement layer found on a second video track. Matroska needs both "
-                   "layers merged into one track, which is not implemented, so the file is written as "
-                   "HDR10 and no Dolby Vision descriptor is claimed.");
-            track.dvBlockAddIdType = 0;
+            baseTrack = &track;
+            continue;
         }
-        videoSeen = true;
+        if (!track.dvBlockAddIdType || baseTrack->dvElStreamIndex >= 0)
+            continue;
+
+        const auto blReader = dynamic_cast<HEVCStreamReader*>(baseTrack->codecReader);
+        const auto elReader = dynamic_cast<HEVCStreamReader*>(track.codecReader);
+        if (blReader == nullptr || elReader == nullptr)
+            continue;
+
+        uint8_t merged[24];
+        const uint32_t mergedType = blReader->buildDoViConfigRecordDualLayer(merged, *elReader);
+        if (mergedType == 0)
+            continue;
+
+        baseTrack->dvElStreamIndex = track.streamIndex;
+        baseTrack->dvBlockAddIdType = mergedType;
+        memcpy(baseTrack->dvConfig, merged, sizeof(merged));
+        track.dvMergedIntoStream = baseTrack->streamIndex;
+        track.dvBlockAddIdType = 0;
+
+        LTRACE(LT_INFO, 2,
+               "Dolby Vision: folding the enhancement layer into the base video track, as Matroska "
+               "requires. The result is one track, profile "
+                   << ((merged[2] >> 1) & 0x7F) << ", level " << (((merged[2] & 1) << 5) | (merged[3] >> 3))
+                   << ", with base layer, enhancement layer and RPU.");
     }
+
+    // Track numbers are handed out as streams are added, so folding one away leaves a gap in the
+    // sequence. A gap is legal, a track number is only an identifier, but renumbering costs nothing
+    // at this point because no block has been written yet, and it keeps the file ordinary.
+    int nextNumber = 1;
+    for (auto& [streamIdx, track] : m_tracks)
+        if (track.dvMergedIntoStream < 0)
+            track.trackNumber = nextNumber++;
 }
 
 void MatroskaMuxer::writeDeferredHeader()
@@ -1041,6 +1095,25 @@ void MatroskaMuxer::writeDeferredHeader()
 
     // Build codec private data for all tracks
     for (auto& [streamIdx, track] : m_tracks) buildCodecPrivate(track);
+
+    // The enhancement layer's own HEVC configuration record, kept on the base track and written
+    // beside the Dolby Vision record as the "hvcE" block addition mapping. It is nothing more than
+    // the enhancement track's CodecPrivate, so no parameter set is parsed a second time. This has
+    // to happen HERE and not while the pairing is decided, because CodecPrivate is built above,
+    // after refreshTrackProperties has run: reading it any earlier stores an empty record and the
+    // mapping is written as a zero length blob without anything failing.
+    for (auto& [streamIdx, track] : m_tracks)
+    {
+        if (track.dvElStreamIndex < 0)
+            continue;
+        const auto el = m_tracks.find(track.dvElStreamIndex);
+        if (el != m_tracks.end())
+            track.dvElConfig = el->second.codecPrivate;
+        if (track.dvElConfig.empty())
+            LTRACE(LT_WARN, 2,
+                   "Dolby Vision: the enhancement layer has no HEVC configuration record, so the hvcE "
+                   "block addition mapping is not written. The track still plays as HDR10.");
+    }
 
     // Write SegmentInfo
     writeSegmentInfo();
@@ -1326,6 +1399,62 @@ std::vector<uint8_t> MatroskaMuxer::convertAnnexBToLengthPrefixed(const uint8_t*
     return result;
 }
 
+std::vector<uint8_t> MatroskaMuxer::convertDvElToLengthPrefixed(const uint8_t* data, int size)
+{
+    // The enhancement layer half of a dual layer Dolby Vision access unit, converted into the same
+    // length prefixed form and appended after the base layer's NALs.
+    //
+    // Every enhancement layer NAL is wrapped in an unspecified NAL of type 63, which is two bytes,
+    // 7E 01, in front of the original NAL INCLUDING its own header. Type 63 is unspecified, so a
+    // decoder that knows nothing about Dolby Vision skips the whole thing and plays the base layer.
+    // That is the entire mechanism.
+    //
+    // The RPU is the exception: it is NAL type 62, already unspecified, and travels as it is. On a
+    // disc it is the last NAL of the enhancement layer access unit, so simply preserving order puts
+    // it last here too, which is where it belongs.
+    //
+    // Nothing is re-escaped. The NAL was emulation prevented before it was wrapped, so it can never
+    // contain 00 00 00, 00 00 01 or 00 00 02, and prefixing two bytes cannot create one.
+    const uint8_t* end = data + size;
+    std::vector<uint8_t> result;
+    result.reserve(size + size / 64);
+
+    uint8_t* curPos = NALUnit::findNextNAL(const_cast<uint8_t*>(data), const_cast<uint8_t*>(end));
+
+    while (curPos < end)
+    {
+        uint8_t* nextNal = NALUnit::findNALWithStartCode(curPos, const_cast<uint8_t*>(end), true);
+        uint8_t* naluEnd = nextNal;
+        if (nextNal < end)
+        {
+            while (naluEnd > curPos && naluEnd[-1] == 0) naluEnd--;
+        }
+
+        const int naluSize = static_cast<int>(naluEnd - curPos);
+        if (naluSize > 0)
+        {
+            const int nalType = (curPos[0] >> 1) & 0x3F;
+            const bool isRpu = nalType == static_cast<int>(HevcUnit::NalType::DVRPU);
+            const int outSize = isRpu ? naluSize : naluSize + 2;
+
+            result.push_back(static_cast<uint8_t>((outSize >> 24) & 0xFF));
+            result.push_back(static_cast<uint8_t>((outSize >> 16) & 0xFF));
+            result.push_back(static_cast<uint8_t>((outSize >> 8) & 0xFF));
+            result.push_back(static_cast<uint8_t>(outSize & 0xFF));
+            if (!isRpu)
+            {
+                result.push_back(0x7E);  // NAL type 63, nuh_layer_id 0
+                result.push_back(0x01);  // nuh_temporal_id_plus1 1
+            }
+            result.insert(result.end(), curPos, naluEnd);
+        }
+
+        curPos = NALUnit::findNextNAL(nextNal, const_cast<uint8_t*>(end));
+    }
+
+    return result;
+}
+
 void MatroskaMuxer::flushCluster()
 {
     if (!m_clusterOpen || m_clusterBuf.empty())
@@ -1379,8 +1508,37 @@ void MatroskaMuxer::flushPendingFrame(MkvTrackInfo& track)
         frameSize = static_cast<int>(convertedData.size());
     }
 
+    // Dual layer Dolby Vision: this base layer picture cannot be written yet. The two layers do
+    // NOT arrive in step, the base layer runs several access units ahead, so the enhancement layer
+    // for this picture has very likely not been delivered at all. Hold the frame instead and write
+    // it once its enhancement access unit is complete.
+    if (track.dvElStreamIndex >= 0)
+    {
+        MkvTrackInfo::HeldFrame held;
+        held.data.assign(frameData, frameData + frameSize);
+        held.pts = track.pendingPts;
+        held.flags = track.pendingFlags;
+        track.dvHeldFrames.push_back(std::move(held));
+        track.pendingFrameData.clear();
+        track.hasPendingFrame = false;
+        drainHeldFrames(track, false);
+        return;
+    }
+
+    writeBlock(track, frameData, frameSize, track.pendingPts, track.pendingFlags);
+
+    track.pendingFrameData.clear();
+    track.hasPendingFrame = false;
+}
+
+// Write one completed frame as a SimpleBlock. Split out of flushPendingFrame so that a dual layer
+// Dolby Vision base track, which has to hold its frames back until the matching enhancement layer
+// access unit has arrived, can emit them through exactly the same path later.
+void MatroskaMuxer::writeBlock(MkvTrackInfo& track, const uint8_t* frameData, int frameSize, int64_t pts,
+                               uint8_t pendingFlags)
+{
     // Compute PTS relative to stream start (convert internal PTS units to milliseconds)
-    const int64_t relMs = (track.pendingPts - m_firstTimecode) / INTERNAL_PTS_PER_MS;
+    const int64_t relMs = (pts - m_firstTimecode) / INTERNAL_PTS_PER_MS;
 
     // Track the maximum timecode for the Duration element
     if (relMs > m_lastTimecodeMs)
@@ -1389,14 +1547,14 @@ void MatroskaMuxer::flushPendingFrame(MkvTrackInfo& track)
     // Decide whether to start a new cluster
     const bool needNewCluster = !m_clusterOpen || (relMs - m_clusterTimecodeMs >= CLUSTER_MAX_DURATION_MS) ||
                                 (m_clusterDataSize >= CLUSTER_MAX_SIZE) ||
-                                (track.trackType == 1 && (track.pendingFlags & AVPacket::IS_IFRAME) && m_clusterOpen &&
+                                (track.trackType == 1 && (pendingFlags & AVPacket::IS_IFRAME) && m_clusterOpen &&
                                  (relMs - m_clusterTimecodeMs >= 1000));
 
     if (needNewCluster)
         startCluster(relMs);
 
     // Record cue entry for video keyframes
-    if (track.trackType == 1 && (track.pendingFlags & AVPacket::IS_IFRAME))
+    if (track.trackType == 1 && (pendingFlags & AVPacket::IS_IFRAME))
     {
         CueEntry cue;
         cue.timecodeMs = relMs;
@@ -1422,15 +1580,71 @@ void MatroskaMuxer::flushPendingFrame(MkvTrackInfo& track)
     m_clusterBuf.push_back(static_cast<uint8_t>(relTimeMs & 0xFF));
 
     uint8_t flags = 0;
-    if (track.pendingFlags & AVPacket::IS_IFRAME)
+    if (pendingFlags & AVPacket::IS_IFRAME)
         flags |= 0x80;
     m_clusterBuf.push_back(flags);
 
     m_clusterBuf.insert(m_clusterBuf.end(), frameData, frameData + frameSize);
     m_clusterDataSize += hdrLen + blockPayloadSize;
+}
 
-    track.pendingFrameData.clear();
-    track.hasPendingFrame = false;
+// Emit held base layer frames whose enhancement layer access unit has arrived complete.
+//
+// The two layers do not arrive in step: the base layer runs ahead by a few access units, so a base
+// frame written the moment it is complete would go out before its enhancement layer exists. Frames
+// are therefore held in arrival order and released from the front as their partner turns up.
+//
+// Matching is by TIMESTAMP, not by position, because position would resynchronise silently to the
+// wrong picture if either stream ever skipped one. An enhancement access unit counts as complete
+// only once the next one has started, or at end of stream, since a large one arrives as several
+// packets.
+//
+// The queue is bounded. If the two streams ever drift further apart than the bound, the oldest
+// frame is written WITHOUT its enhancement layer and counted, rather than growing memory without
+// limit or deadlocking. That count is reported at the end of the mux.
+void MatroskaMuxer::drainHeldFrames(MkvTrackInfo& track, const bool atEndOfStream)
+{
+    constexpr size_t MAX_HELD_FRAMES = 64;
+
+    if (atEndOfStream && !track.pendingElData.empty())
+    {
+        // The last enhancement access unit has no successor to close it.
+        track.dvElDone[track.dvElPts] = std::move(track.pendingElData);
+        track.pendingElData.clear();
+    }
+
+    while (!track.dvHeldFrames.empty())
+    {
+        MkvTrackInfo::HeldFrame& front = track.dvHeldFrames.front();
+        const auto el = track.dvElDone.find(front.pts);
+        const bool forced = atEndOfStream || track.dvHeldFrames.size() > MAX_HELD_FRAMES;
+
+        if (el == track.dvElDone.end() && !forced)
+            break;  // its enhancement layer may still be on its way
+
+        if (el != track.dvElDone.end())
+        {
+            const std::vector<uint8_t> wrapped =
+                convertDvElToLengthPrefixed(el->second.data(), static_cast<int>(el->second.size()));
+            front.data.insert(front.data.end(), wrapped.begin(), wrapped.end());
+            track.dvElDone.erase(el);
+            track.dvElFramesMerged++;
+        }
+        else
+        {
+            track.dvElFramesUnmatched++;
+        }
+
+        writeBlock(track, front.data.data(), static_cast<int>(front.data.size()), front.pts, front.flags);
+        track.dvHeldFrames.pop_front();
+    }
+
+    if (atEndOfStream)
+    {
+        // Anything still here belongs to pictures that were never delivered.
+        track.dvElFramesUnmatched += static_cast<int64_t>(track.dvElDone.size());
+        track.dvElDone.clear();
+    }
 }
 
 bool MatroskaMuxer::muxPacket(AVPacket& avPacket)
@@ -1484,6 +1698,28 @@ bool MatroskaMuxer::muxPacketInternal(AVPacket& avPacket)
 
     MkvTrackInfo& track = it->second;
 
+    // A folded Dolby Vision enhancement layer writes no block of its own. Its bytes are collected
+    // on the base track, one access unit at a time, and appended to the matching base layer frame.
+    if (track.dvMergedIntoStream >= 0)
+    {
+        const auto base = m_tracks.find(track.dvMergedIntoStream);
+        if (base == m_tracks.end())
+            return true;
+        MkvTrackInfo& bl = base->second;
+
+        // A packet with a new timestamp means the previous access unit is complete. Only then can
+        // it be matched, because a large one arrives as several packets.
+        if (!bl.pendingElData.empty() && bl.dvElPts != avPacket.pts)
+        {
+            bl.dvElDone[bl.dvElPts] = std::move(bl.pendingElData);
+            bl.pendingElData.clear();
+            drainHeldFrames(bl, false);
+        }
+        bl.dvElPts = avPacket.pts;
+        bl.pendingElData.insert(bl.pendingElData.end(), avPacket.data, avPacket.data + avPacket.size);
+        return true;
+    }
+
     // If this packet has a different PTS than the pending frame, flush the pending frame first.
     // This handles the case where the MPEG stream reader splits large frames into multiple
     // packets with the same PTS.
@@ -1513,6 +1749,28 @@ bool MatroskaMuxer::doFlush()
 {
     // Flush all pending accumulated frames
     for (auto& [streamIdx, track] : m_tracks) flushPendingFrame(track);
+
+    // Then release every base layer frame still held for its enhancement layer.
+    for (auto& [streamIdx, track] : m_tracks)
+        if (track.dvElStreamIndex >= 0)
+            drainHeldFrames(track, true);
+
+    // Say plainly how the dual layer merge went. A count of frames that could not be placed is the
+    // one number that says the output is not what it claims to be, and it must not be silent: the
+    // file would still play, as HDR10, with a Dolby Vision record promising more than it delivers.
+    for (auto& [streamIdx, track] : m_tracks)
+    {
+        if (track.dvElStreamIndex < 0)
+            continue;
+        LTRACE(LT_INFO, 2,
+               "Dolby Vision: " << track.dvElFramesMerged << " enhancement layer frames merged into the base "
+                                << "video track.");
+        if (track.dvElFramesUnmatched > 0)
+            LTRACE(LT_WARN, 2,
+                   "Dolby Vision: " << track.dvElFramesUnmatched
+                                    << " enhancement layer frames could not be matched to a base "
+                                       "layer picture and were left out.");
+    }
 
     flushCluster();
     return true;

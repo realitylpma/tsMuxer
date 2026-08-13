@@ -20,6 +20,12 @@ class HEVCStreamReader final : public MPEGStreamReader
     bool getDoViParams(int& profile, int& level, int& compatibility, bool& isDVBLOut) const;
     // Writes 24 bytes and returns the Matroska BlockAddIDType (dvcC or dvvC), or 0 if not DV.
     [[nodiscard]] uint32_t buildDoViConfigRecord(uint8_t* dst) const;
+    // The same 24 bytes for a MERGED dual layer track. Called on the BASE layer reader.
+    [[nodiscard]] uint32_t buildDoViConfigRecordDualLayer(uint8_t* dst, const HEVCStreamReader& el) const;
+    // The profile / level tables, shared so there is exactly one copy of each.
+    void doViProfileAndCompatibility(bool isEnhancementLayer, int& profile, int& compatibility) const;
+    static int doViLevelFor(unsigned width, uint32_t pixelRate);
+    [[nodiscard]] uint32_t doViPixelRate() const;
     CheckStreamRez checkStream(uint8_t* buffer, int len);
     void applyDiscoveryData(const StreamDiscoveryData& data) override;
     void fillVideoDiscoveryData(StreamDiscoveryData& data) override;

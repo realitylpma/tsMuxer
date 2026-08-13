@@ -1,6 +1,7 @@
 #ifndef MATROSKA_MUXER_H_
 #define MATROSKA_MUXER_H_
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <set>
@@ -95,6 +96,32 @@ class MatroskaMuxer final : public AbstractMuxer
         uint32_t dvBlockAddIdType;
         uint8_t dvConfig[24];
 
+        // Dual layer Dolby Vision. A disc carries the picture on two video streams, a base layer
+        // and a quarter resolution enhancement layer holding the RPU; Matroska carries both in ONE
+        // track. On the base track dvElStreamIndex names the enhancement stream being folded in and
+        // dvElConfig holds that stream's own HEVC configuration record, written beside the Dolby
+        // Vision record as the "hvcE" block addition mapping. On the enhancement track
+        // dvMergedIntoStream names the base track it was folded into, and no track entry and no
+        // block of its own are written for it.
+        int dvElStreamIndex;
+        int dvMergedIntoStream;
+        std::vector<uint8_t> dvElConfig;
+
+        // A base layer frame waiting for its enhancement layer. The two layers do not arrive in
+        // step, so frames are held in arrival order and released as their partner turns up.
+        struct HeldFrame
+        {
+            std::vector<uint8_t> data;
+            int64_t pts;
+            uint8_t flags;
+        };
+        std::deque<HeldFrame> dvHeldFrames;
+        std::map<int64_t, std::vector<uint8_t>> dvElDone;  // completed enhancement AUs, by pts
+        std::vector<uint8_t> pendingElData;                // the enhancement AU still arriving
+        int64_t dvElPts;
+        int64_t dvElFramesMerged;
+        int64_t dvElFramesUnmatched;
+
         // Audio-specific
         int sampleRate;
         int channels;
@@ -132,6 +159,11 @@ class MatroskaMuxer final : public AbstractMuxer
               isHdr10(false),
               dvBlockAddIdType(0),
               dvConfig{},
+              dvElStreamIndex(-1),
+              dvMergedIntoStream(-1),
+              dvElPts(-1),
+              dvElFramesMerged(0),
+              dvElFramesUnmatched(0),
               sampleRate(0),
               channels(0),
               bitDepth(0),
@@ -248,6 +280,10 @@ class MatroskaMuxer final : public AbstractMuxer
 
     // Flush any pending accumulated frame data for a track as a single SimpleBlock.
     void flushPendingFrame(MkvTrackInfo& track);
+    // Emit one completed frame. Shared by the ordinary path and by the dual layer Dolby Vision
+    // path, which writes its frames later than it finishes them.
+    void writeBlock(MkvTrackInfo& track, const uint8_t* frameData, int frameSize, int64_t pts, uint8_t pendingFlags);
+    void drainHeldFrames(MkvTrackInfo& track, bool atEndOfStream);
 
     // Internal mux logic (called after header is written)
     bool muxPacketInternal(AVPacket& avPacket);
@@ -258,6 +294,9 @@ class MatroskaMuxer final : public AbstractMuxer
     // Returns empty vector if no conversion needed (data is passed through as-is).
     static std::vector<uint8_t> convertAV1ToLowOverhead(const uint8_t* data, int size);
     static std::vector<uint8_t> convertAnnexBToLengthPrefixed(const uint8_t* data, int size);
+    // The same, for the enhancement layer half of a dual layer Dolby Vision access unit: every NAL
+    // wrapped in an unspecified type 63 NAL, except the RPU which passes through unchanged.
+    static std::vector<uint8_t> convertDvElToLengthPrefixed(const uint8_t* data, int size);
 
     // Cluster splitting thresholds
     static constexpr int64_t CLUSTER_MAX_DURATION_MS = 5000;      // 5 seconds
