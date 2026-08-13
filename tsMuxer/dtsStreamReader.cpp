@@ -896,10 +896,18 @@ void DTSStreamReader::probeDtsX(uint8_t* buff, const uint8_t* end)
             uint32_t word = 0;
             if (!xllTrailerWord(buff + a.xllOffset, a.xllSize, word))
                 continue;
-            if (word == DTSX_MARKER || (word & DTSX_IMAX_MASK) == DTSX_IMAX_MARKER)
+            const bool imaxWord = (word & DTSX_IMAX_MASK) == DTSX_IMAX_MARKER;
+            if (word == DTSX_MARKER || imaxWord)
             {
+                if (imaxWord)
+                    m_dtsxImaxHits++;
                 if (++m_dtsxHits >= DTSX_MIN_HITS)
+                {
                     m_isDtsX = true;
+                    // Same discipline as the badge itself: it takes more than one word, so a
+                    // single stray value cannot decide which family this is.
+                    m_isDtsXImax = m_dtsxImaxHits >= DTSX_MIN_HITS;
+                }
             }
         }
     }
@@ -1346,8 +1354,17 @@ const std::string DTSStreamReader::getStreamInfo()
             break;
         }
 
+        // The IMAX variant of the marker is named separately, the way the usual identification
+        // tools name it: they call this track "DTS-HD MA + IMAX Enhanced" where a plain DTS:X
+        // track is just "DTS-HD MA + DTS:X".
+        //
+        // IT NAMES THE AUDIO AND NOTHING ELSE. It does NOT say the title is an IMAX Enhanced
+        // presentation, and the difference was measured rather than assumed: two demo trailers
+        // carrying this same marker display at 1.7778:1, plain 16:9, while an IMAX Enhanced
+        // presentation is 1.90:1. So the marker identifies an audio encoding variant, and a
+        // certified IMAX picture is a separate thing that is not a flag in the bitstream at all.
         if (m_isDtsX)
-            str << " + DTS:X";
+            str << (m_isDtsXImax ? " + DTS:X IMAX" : " + DTS:X");
 
         if (hd_bitDepth > 16)
             str << " 24bit";

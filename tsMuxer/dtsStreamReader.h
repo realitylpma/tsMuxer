@@ -44,8 +44,10 @@ class DTSStreamReader final : public SimplePacketizerReader
         m_dtsEsChannels = 0;
         m_testMode = false;
         m_isDtsX = false;
+        m_isDtsXImax = false;
         m_dtsxFramesProbed = 0;
         m_dtsxHits = 0;
+        m_dtsxImaxHits = 0;
     }
     int getTSDescriptor(uint8_t* dstBuff, bool blurayMode, bool hdmvDescriptors) override;
     void setDownconvertToDTS(const bool value) { m_downconvertToDTS = value; }
@@ -125,8 +127,10 @@ class DTSStreamReader final : public SimplePacketizerReader
     int m_dtsEsChannels;
     bool m_testMode;
     bool m_isDtsX;
+    bool m_isDtsXImax;
     int m_dtsxFramesProbed;
     int m_dtsxHits;
+    int m_dtsxImaxHits;
 
     double m_frameDuration;
     int syncInfo16be(const uint8_t* p_buf);
