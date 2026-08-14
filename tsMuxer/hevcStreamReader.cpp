@@ -515,6 +515,44 @@ uint32_t HEVCStreamReader::buildDoViConfigRecordDualLayer(uint8_t* dst, const HE
     return profile > 7 ? 0x64767643 /* dvvC */ : 0x64766343 /* dvcC */;
 }
 
+// The record for a track whose RPU has been CONVERTED to profile 8.1 (--dv-profile=8.1). Called on
+// the base layer reader, like the dual layer one, but it describes something different: a single
+// layer profile 8.1 stream, cross compatible with HDR10, which is what the converted RPU makes it.
+//
+// el_present is 0 and that is the whole point. The enhancement layer is still physically present in
+// the track, wrapped in unspecified NAL type 63 so a decoder skips it, but it is no longer part of
+// what the player is being asked to decode. Declaring el_present 1 here would describe a dual layer
+// stream and defeat the conversion; the enhancement layer is carried for rebuilding the disc later,
+// not for playback.
+//
+// compatibility 1 means the base layer is HDR10, which is what profile 8.1 is, and is what lets a
+// display without Dolby Vision show the picture correctly.
+uint32_t HEVCStreamReader::buildDoViConfigRecordProfile81(uint8_t* dst) const
+{
+    if (m_sps == nullptr)
+        return 0;
+
+    constexpr int profile = 8;
+    constexpr int compatibility = 1;
+    const int level = doViLevelFor(getStreamWidth(), doViPixelRate());
+
+    memset(dst, 0, 24);
+    BitStreamWriter w{};
+    w.setBuffer(dst, dst + 24);
+    w.putBits(8, 1);  // dv_version_major
+    w.putBits(8, 0);  // dv_version_minor
+    w.putBits(7, profile);
+    w.putBits(6, level);
+    w.putBits(1, 1);              // rpu_present_flag
+    w.putBits(1, 0);              // el_present_flag: single layer, see above
+    w.putBits(1, 1);              // bl_present_flag
+    w.putBits(4, compatibility);  // dv_bl_signal_compatibility_id: HDR10 compatible
+    w.putBits(28, 0);             // reserved
+    w.flushBits();
+
+    return 0x64767643;  // dvvC, which is what profile 8 uses
+}
+
 int HEVCStreamReader::setDoViDescriptor(uint8_t* dstBuff) const
 {
     int profile = 0;

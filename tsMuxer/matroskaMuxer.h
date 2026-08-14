@@ -246,6 +246,19 @@ class MatroskaMuxer final : public AbstractMuxer
     std::map<int, MkvTrackInfo> m_tracks;  // keyed by streamIndex
     int m_nextTrackNumber;
 
+    // --dv-profile=8.1. A dual layer profile 7 disc is understood by few devices, while profile 8.1
+    // plays almost everywhere, so the RPU is converted to 8.1 as the track is written and the track
+    // declares itself single layer. The enhancement layer still rides along, wrapped in unspecified
+    // NAL type 63, which a decoder skips: that is what keeps the original disc recoverable, and it
+    // is why the file does NOT get smaller the way the usual one way conversion does.
+    //
+    // m_dvOriginalRpuBin collects the ORIGINAL profile 7 RPUs in the layout dovi_tool's extract-rpu
+    // writes (a 4-byte start code then the RPU payload without its 2-byte NAL header), so the
+    // preserved original is readable by the existing tooling and not only by tsMuxeR.
+    bool m_dvWriteProfile81 = false;
+    std::vector<uint8_t> m_dvOriginalRpuBin;
+    int64_t m_dvRpusConverted = 0;
+
     // Segment layout
     int64_t m_segmentStartPos;  // file position of the first byte after the Segment header
     int64_t m_segmentSizePos;   // file position where the segment's VINT size is written
@@ -312,7 +325,8 @@ class MatroskaMuxer final : public AbstractMuxer
     static std::vector<uint8_t> convertAnnexBToLengthPrefixed(const uint8_t* data, int size);
     // The same, for the enhancement layer half of a dual layer Dolby Vision access unit: every NAL
     // wrapped in an unspecified type 63 NAL, except the RPU which passes through unchanged.
-    static std::vector<uint8_t> convertDvElToLengthPrefixed(const uint8_t* data, int size);
+    // Not static: in profile 8.1 mode it converts the RPU as it passes and keeps the original.
+    std::vector<uint8_t> convertDvElToLengthPrefixed(const uint8_t* data, int size);
 
     // Cluster splitting thresholds
     static constexpr int64_t CLUSTER_MAX_DURATION_MS = 5000;      // 5 seconds

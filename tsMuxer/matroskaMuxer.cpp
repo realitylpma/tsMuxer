@@ -13,6 +13,7 @@
 #include "av1.h"
 #include "av1StreamReader.h"
 #include "avCodecs.h"
+#include "doviLib.h"
 #include "dtsStreamReader.h"
 #include "flacStreamReader.h"
 #include "h264StreamReader.h"
@@ -629,8 +630,42 @@ void MatroskaMuxer::buildCodecPrivate(MkvTrackInfo& track)
 
 void MatroskaMuxer::parseMuxOpt(const std::string& opts)
 {
-    // Currently no MKV-specific options to parse
-    (void)opts;
+    // --dv-profile=<7|8.1>. 7 is the default and means "carry the disc as it is", the faithful dual
+    // layer track. 8.1 converts the RPU so the file plays as single layer Dolby Vision on the many
+    // devices that do not understand profile 7.
+    const std::string key = "--dv-profile=";
+    const size_t at = opts.find(key);
+    if (at == std::string::npos)
+        return;
+
+    size_t valStart = at + key.size();
+    size_t valEnd = opts.find_first_of(" \t", valStart);
+    if (valEnd == std::string::npos)
+        valEnd = opts.size();
+    const std::string value = opts.substr(valStart, valEnd - valStart);
+
+    if (value == "7")
+    {
+        m_dvWriteProfile81 = false;
+    }
+    else if (value == "8.1" || value == "81")
+    {
+        // Checked HERE rather than when the first RPU turns up, because that would be most of the
+        // way through a mux of a feature. The message names the library and what to do about it.
+        if (!DoviLib::instance().available())
+        {
+            THROW(ERR_COMMON, "--dv-profile=8.1 needs "
+                                  << DoviLib::libraryName() << ", which converts the Dolby Vision metadata, and "
+                                  << DoviLib::instance().loadError()
+                                  << ". Put it beside tsMuxeR (a prebuilt one is published with dovi_tool for 64 bit "
+                                     "Windows; other platforms build libdovi from source), or leave --dv-profile at 7.")
+        }
+        m_dvWriteProfile81 = true;
+    }
+    else
+    {
+        THROW(ERR_COMMON, "Invalid --dv-profile value '" << value << "'. Expected 7 or 8.1.")
+    }
 }
 
 // ──────────────── File I/O helpers ───────────────────────────────────────────
@@ -1078,8 +1113,12 @@ void MatroskaMuxer::refreshTrackProperties()
         if (blReader == nullptr || elReader == nullptr)
             continue;
 
+        // In profile 8.1 mode the pairing still happens, because the enhancement layer is still
+        // folded into the one track, but the track is DESCRIBED as single layer 8.1: that is what
+        // the converted RPU makes it, and it is why players that refuse profile 7 will take it.
         uint8_t merged[24];
-        const uint32_t mergedType = blReader->buildDoViConfigRecordDualLayer(merged, *elReader);
+        const uint32_t mergedType = m_dvWriteProfile81 ? blReader->buildDoViConfigRecordProfile81(merged)
+                                                       : blReader->buildDoViConfigRecordDualLayer(merged, *elReader);
         if (mergedType == 0)
             continue;
 
@@ -1089,11 +1128,20 @@ void MatroskaMuxer::refreshTrackProperties()
         track.dvMergedIntoStream = baseTrack->streamIndex;
         track.dvBlockAddIdType = 0;
 
-        LTRACE(LT_INFO, 2,
-               "Dolby Vision: folding the enhancement layer into the base video track, as Matroska "
-               "requires. The result is one track, profile "
-                   << ((merged[2] >> 1) & 0x7F) << ", level " << (((merged[2] & 1) << 5) | (merged[3] >> 3))
-                   << ", with base layer, enhancement layer and RPU.");
+        if (m_dvWriteProfile81)
+            LTRACE(LT_INFO, 2,
+                   "Dolby Vision: writing profile 8.1. The RPU is converted, so the track declares "
+                   "single layer profile "
+                       << ((merged[2] >> 1) & 0x7F) << ", level " << (((merged[2] & 1) << 5) | (merged[3] >> 3))
+                       << ", HDR10 compatible, which plays on devices that refuse profile 7. The disc's "
+                          "enhancement layer still travels in the track, skipped by decoders, so the file "
+                          "is NOT smaller than a profile 7 one.");
+        else
+            LTRACE(LT_INFO, 2,
+                   "Dolby Vision: folding the enhancement layer into the base video track, as Matroska "
+                   "requires. The result is one track, profile "
+                       << ((merged[2] >> 1) & 0x7F) << ", level " << (((merged[2] & 1) << 5) | (merged[3] >> 3))
+                       << ", with base layer, enhancement layer and RPU.");
     }
 
     // A Blu-ray TrueHD track arrives as its lossless frames PLUS a 448 kbps AC-3 core, both on one
@@ -1525,7 +1573,35 @@ std::vector<uint8_t> MatroskaMuxer::convertDvElToLengthPrefixed(const uint8_t* d
         {
             const int nalType = (curPos[0] >> 1) & 0x3F;
             const bool isRpu = nalType == static_cast<int>(HevcUnit::NalType::DVRPU);
-            const int outSize = isRpu ? naluSize : naluSize + 2;
+
+            // Profile 8.1 mode: the RPU that goes into the picture is the CONVERTED one, and the
+            // original is kept aside so the disc can be rebuilt from this file later. Everything
+            // else, the enhancement layer included, is untouched and still travels inert.
+            std::vector<uint8_t> converted;
+            if (isRpu && m_dvWriteProfile81)
+            {
+                std::string err;
+                if (!DoviLib::instance().convertRpuToProfile81(curPos, static_cast<size_t>(naluSize), converted, err))
+                {
+                    // Refusing beats finishing. A file whose RPUs are part converted and part not
+                    // would look complete and play wrong, which is the failure this whole design is
+                    // built to avoid.
+                    THROW(ERR_COMMON, "Dolby Vision: converting an RPU to profile 8.1 failed after "
+                                          << m_dvRpusConverted << " frames: " << err)
+                }
+                // The original, in the layout dovi_tool's extract-rpu writes: a 4-byte start code
+                // then the payload WITHOUT its two byte NAL header. Verified against a real RPU.bin.
+                m_dvOriginalRpuBin.push_back(0x00);
+                m_dvOriginalRpuBin.push_back(0x00);
+                m_dvOriginalRpuBin.push_back(0x00);
+                m_dvOriginalRpuBin.push_back(0x01);
+                m_dvOriginalRpuBin.insert(m_dvOriginalRpuBin.end(), curPos + 2, naluEnd);
+                m_dvRpusConverted++;
+            }
+
+            const bool useConverted = !converted.empty();
+            const int payloadSize = useConverted ? static_cast<int>(converted.size()) : naluSize;
+            const int outSize = isRpu ? payloadSize : payloadSize + 2;
 
             result.push_back(static_cast<uint8_t>((outSize >> 24) & 0xFF));
             result.push_back(static_cast<uint8_t>((outSize >> 16) & 0xFF));
@@ -1536,7 +1612,10 @@ std::vector<uint8_t> MatroskaMuxer::convertDvElToLengthPrefixed(const uint8_t* d
                 result.push_back(0x7E);  // NAL type 63, nuh_layer_id 0
                 result.push_back(0x01);  // nuh_temporal_id_plus1 1
             }
-            result.insert(result.end(), curPos, naluEnd);
+            if (useConverted)
+                result.insert(result.end(), converted.begin(), converted.end());
+            else
+                result.insert(result.end(), curPos, naluEnd);
         }
 
         curPos = NALUnit::findNextNAL(nextNal, const_cast<uint8_t*>(end));
