@@ -2507,6 +2507,70 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Also fill before the break</source>
+        <translation>ブレイク前も埋める</translation>
+    </message>
+    <message>
+        <source>BD-R DL 50 GB, 2 layers (24,438,784 sectors)</source>
+        <translation>BD-R DL 50 GB、2層 (24,438,784 セクタ)</translation>
+    </message>
+    <message>
+        <source>BD-RE DL 50 GB, 2 layers (23,652,352 sectors)</source>
+        <translation>BD-RE DL 50 GB、2層 (23,652,352 セクタ)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, 3 layers (48,878,592 sectors)</source>
+        <translation>BD-R XL 100 GB、3層 (48,878,592 セクタ)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)</source>
+        <translation>BD-R XL 100 GB、最初の2層のみ (32,585,728 セクタ)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 128 GB, 4 layers (62,500,864 sectors)</source>
+        <translation>BD-R XL 128 GB、4層 (62,500,864 セクタ)</translation>
+    </message>
+    <message>
+        <source>How much to fill BEFORE the break. Only used when the box beside it is ticked.</source>
+        <translation>ブレイクの前をどれだけ埋めるか。隣のチェックボックスをオンにしたときだけ使われます。</translation>
+    </message>
+    <message>
+        <source>ImgBurn -&gt; Free Sectors (e.g. 48,878,592)</source>
+        <translation>ImgBurn の Free Sectors (例: 48,878,592)</translation>
+    </message>
+    <message>
+        <source>Layer break(s) at sector: %1</source>
+        <translation>レイヤーブレイク位置 (セクタ): %1</translation>
+    </message>
+    <message>
+        <source>At your own risk: this is still BD-R XL media, which many Blu-ray players cannot read at all. Using only the first two layers and finalizing the disc improves the odds on some players, but nothing guarantees it. Always test on your own device.</source>
+        <translation>自己責任でご利用ください。これも BD-R XL メディアであり、まったく読み込めない Blu-ray プレーヤーも多くあります。最初の2層だけを使ってディスクをファイナライズすると一部のプレーヤーでは可能性が上がりますが、保証されるものではありません。必ずお手持ちの機器でテストしてください。</translation>
+    </message>
+    <message>
+        <source>The guard normally goes entirely after the break, where discs fail most often. Switch this on to fill before it as well, for media that are also weak just before the transition. Both zones are set independently; this one costs that much more space.</source>
+        <translation>ガードは通常、ディスクが最も失敗しやすいブレイクの後ろにすべて配置されます。移行の直前も弱いメディアのために、これをオンにするとブレイクの前にも埋め込みます。前後の領域は個別に設定でき、この領域はそのぶん余分に容量を使います。</translation>
+    </message>
+    <message>
+        <source>At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. Keeping the image around 66 GB (the first two layers, selectable above) and finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R XL media. Always test on your own device.</source>
+        <translation>自己責任でご利用ください。100/128 GB の BD-R XL ディスクをまったく読み込めない Blu-ray プレーヤーも多く、お使いの機器で再生できる保証はありません。イメージを約 66 GB（最初の2層分、上で選択できます）に抑えてディスクをファイナライズすると一部のプレーヤーでは再生できる可能性が上がりますが、66 GB でも再生が保証されるわけではありません。100/128 GB をフルに使うには、大容量の BD-R XL メディアへの対応を明記した新しめのプレーヤーが必要です。必ずお手持ちの機器でテストしてください。</translation>
+    </message>
+    <message>
+        <source>Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. You are proceeding at your own risk.
+
+Keeping the image around 66 GB (the first two layers, selectable as its own disc entry) improves the odds on some players, but even 66 GB is not guaranteed to play. Test on your own device.
+
+Build the ISO anyway?</source>
+        <translation>100/128 GBのBD-R XLディスクをまったく読み込めないBlu-rayプレーヤーは少なくなく、お使いの機器で再生できる保証はありません。この先は自己責任での操作となります。
+
+イメージを約66 GB（最初の2層分、専用のディスク項目として選択できます）に抑えると再生できる可能性が上がるプレーヤーもありますが、66 GBでも再生は保証されません。必ずお手持ちの機器でテストしてください。
+
+このままISOを作成しますか？</translation>
+    </message>
+    <message>
+        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>ディスクを選択すると、下にその Free Sectors が自動入力されます。同じ容量表記のディスクでも Free Sectors は2通りあるため、この数値は必ずお使いのディスクについて ImgBurn が表示する値と照合してください。欠陥管理ありのディスクは1層あたり 1 GiB を予備領域として確保し、代わりに 47,305,728 (100 GB)、60,403,712 (128 GB)、23,652,352 (BD-RE DL) と表示されます。異なる場合は「Free Sectors を手動で入力」にチェックを入れ、ImgBurn の値を入力してください。レイヤーブレイクはこの数値から計算されるため、誤った値はガードを誤った位置に置きます。</translation>
+    </message>
+    <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
         <source>Input</source>
         <translation>入力</translation>

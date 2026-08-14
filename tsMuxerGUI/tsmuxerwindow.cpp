@@ -1521,8 +1521,7 @@ TsMuxerWindow::TsMuxerWindow()
                     beforeCheck->setEnabled(on && iso);
                     beforeSpin->setEnabled(on && iso && beforeCheck->isChecked());
                 });
-        connect(beforeCheck, &QCheckBox::toggled, beforeSpin,
-                [this, guardCheck, beforeSpin](const bool on)
+        connect(beforeCheck, &QCheckBox::toggled, beforeSpin, [this, guardCheck, beforeSpin](const bool on)
                 { beforeSpin->setEnabled(on && guardCheck->isChecked() && ui->radioButtonBluRayISO->isChecked()); });
         // Add to the main window's Output group. Use ui->verticalLayout_2 directly rather than
         // findChild("verticalLayout_2"): the muxForm progress dialog is a child of this window and has a

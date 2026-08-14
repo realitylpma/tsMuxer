@@ -2507,6 +2507,70 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Also fill before the break</source>
+        <translation>Remplir aussi avant le changement</translation>
+    </message>
+    <message>
+        <source>BD-R DL 50 GB, 2 layers (24,438,784 sectors)</source>
+        <translation>BD-R DL 50 GB, 2 couches (24,438,784 secteurs)</translation>
+    </message>
+    <message>
+        <source>BD-RE DL 50 GB, 2 layers (23,652,352 sectors)</source>
+        <translation>BD-RE DL 50 GB, 2 couches (23,652,352 secteurs)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, 3 layers (48,878,592 sectors)</source>
+        <translation>BD-R XL 100 GB, 3 couches (48,878,592 secteurs)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)</source>
+        <translation>BD-R XL 100 GB, les 2 premières couches seulement (32,585,728 secteurs)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 128 GB, 4 layers (62,500,864 sectors)</source>
+        <translation>BD-R XL 128 GB, 4 couches (62,500,864 secteurs)</translation>
+    </message>
+    <message>
+        <source>How much to fill BEFORE the break. Only used when the box beside it is ticked.</source>
+        <translation>Quantité à remplir AVANT le changement. Utilisé uniquement si la case voisine est cochée.</translation>
+    </message>
+    <message>
+        <source>ImgBurn -&gt; Free Sectors (e.g. 48,878,592)</source>
+        <translation>ImgBurn -&gt; Free Sectors (par ex. 48,878,592)</translation>
+    </message>
+    <message>
+        <source>Layer break(s) at sector: %1</source>
+        <translation>Changement(s) de couche au secteur : %1</translation>
+    </message>
+    <message>
+        <source>At your own risk: this is still BD-R XL media, which many Blu-ray players cannot read at all. Using only the first two layers and finalizing the disc improves the odds on some players, but nothing guarantees it. Always test on your own device.</source>
+        <translation>À vos risques et périls : il s'agit toujours d'un support BD-R XL, que de nombreux lecteurs Blu-ray sont incapables de lire. N'utiliser que les deux premières couches et finaliser le disque augmente les chances sur certains lecteurs, mais ne garantit rien. Testez toujours sur votre propre appareil.</translation>
+    </message>
+    <message>
+        <source>The guard normally goes entirely after the break, where discs fail most often. Switch this on to fill before it as well, for media that are also weak just before the transition. Both zones are set independently; this one costs that much more space.</source>
+        <translation>La bande de garde est normalement placée entièrement après le changement, là où les disques échouent le plus souvent. Activez ceci pour remplir aussi avant, pour les supports également fragiles juste avant la transition. Les deux zones se règlent indépendamment ; celle-ci coûte d'autant plus d'espace.</translation>
+    </message>
+    <message>
+        <source>At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. Keeping the image around 66 GB (the first two layers, selectable above) and finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R XL media. Always test on your own device.</source>
+        <translation>À vos risques et périls : de nombreux lecteurs Blu-ray sont incapables de lire les disques BD-R XL de 100/128 GB, et rien ne garantit que le vôtre y parviendra. Limiter l'image à environ 66 GB (les deux premières couches, sélectionnables ci-dessus) et finaliser le disque augmente les chances sur certains lecteurs, mais même 66 GB ne garantit pas la lecture. Les 100/128 GB complets exigent un lecteur récent prenant explicitement en charge les supports BD-R XL haute capacité. Testez toujours sur votre propre appareil.</translation>
+    </message>
+    <message>
+        <source>Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. You are proceeding at your own risk.
+
+Keeping the image around 66 GB (the first two layers, selectable as its own disc entry) improves the odds on some players, but even 66 GB is not guaranteed to play. Test on your own device.
+
+Build the ISO anyway?</source>
+        <translation>De nombreux lecteurs Blu-ray sont incapables de lire les disques BD-R XL de 100/128 GB, et rien ne garantit que le vôtre y parviendra. Vous procédez à vos risques et périls.
+
+Limiter l'image à environ 66 GB (les deux premières couches, sélectionnables comme entrée de disque distincte) augmente les chances sur certains lecteurs, mais même 66 GB ne garantit pas la lecture. Testez sur votre propre appareil.
+
+Créer l'ISO malgré tout ?</translation>
+    </message>
+    <message>
+        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>Choisir un disque pré-remplit ses Free Sectors ci-dessous. Vérifiez TOUJOURS ce nombre par rapport à celui qu'ImgBurn affiche pour votre propre disque, car la même taille de disque existe avec deux capacités : un disque à gestion des défauts réserve 1 GiB par couche comme zone de secours et indique 47,305,728 (100 GB), 60,403,712 (128 GB) ou 23,652,352 (BD-RE DL) à la place. Si le vôtre diffère, cochez "Saisir les Free Sectors manuellement" et tapez ce qu'affiche ImgBurn : le changement de couche est calculé à partir de ce nombre, une valeur erronée place donc la bande de garde au mauvais endroit.</translation>
+    </message>
+    <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
         <source>Input</source>
         <translation>Entrée</translation>

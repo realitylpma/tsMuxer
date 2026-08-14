@@ -2507,6 +2507,70 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Also fill before the break</source>
+        <translation>Auch vor dem Break auffüllen</translation>
+    </message>
+    <message>
+        <source>BD-R DL 50 GB, 2 layers (24,438,784 sectors)</source>
+        <translation>BD-R DL 50 GB, 2 Schichten (24,438,784 Sektoren)</translation>
+    </message>
+    <message>
+        <source>BD-RE DL 50 GB, 2 layers (23,652,352 sectors)</source>
+        <translation>BD-RE DL 50 GB, 2 Schichten (23,652,352 Sektoren)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, 3 layers (48,878,592 sectors)</source>
+        <translation>BD-R XL 100 GB, 3 Schichten (48,878,592 Sektoren)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)</source>
+        <translation>BD-R XL 100 GB, nur die ersten 2 Schichten (32,585,728 Sektoren)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 128 GB, 4 layers (62,500,864 sectors)</source>
+        <translation>BD-R XL 128 GB, 4 Schichten (62,500,864 Sektoren)</translation>
+    </message>
+    <message>
+        <source>How much to fill BEFORE the break. Only used when the box beside it is ticked.</source>
+        <translation>Wie viel VOR dem Break aufgefüllt wird. Wird nur verwendet, wenn das Kästchen daneben angehakt ist.</translation>
+    </message>
+    <message>
+        <source>ImgBurn -&gt; Free Sectors (e.g. 48,878,592)</source>
+        <translation>ImgBurn -&gt; Free Sectors (z. B. 48,878,592)</translation>
+    </message>
+    <message>
+        <source>Layer break(s) at sector: %1</source>
+        <translation>Layer-Break(s) bei Sektor: %1</translation>
+    </message>
+    <message>
+        <source>At your own risk: this is still BD-R XL media, which many Blu-ray players cannot read at all. Using only the first two layers and finalizing the disc improves the odds on some players, but nothing guarantees it. Always test on your own device.</source>
+        <translation>Auf eigene Gefahr: Das ist weiterhin BD-R-XL-Medium, das viele Blu-ray-Player überhaupt nicht lesen können. Nur die ersten beiden Layer zu nutzen und die Disc zu finalisieren verbessert die Chancen bei manchen Playern, garantiert aber nichts. Testen Sie immer auf Ihrem eigenen Gerät.</translation>
+    </message>
+    <message>
+        <source>The guard normally goes entirely after the break, where discs fail most often. Switch this on to fill before it as well, for media that are also weak just before the transition. Both zones are set independently; this one costs that much more space.</source>
+        <translation>Der Schutz liegt normalerweise vollständig hinter dem Break, wo Discs am häufigsten versagen. Schalten Sie dies ein, um auch davor aufzufüllen, für Medien, die auch kurz vor dem Übergang anfällig sind. Beide Zonen werden unabhängig eingestellt; diese kostet entsprechend zusätzlichen Platz.</translation>
+    </message>
+    <message>
+        <source>At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. Keeping the image around 66 GB (the first two layers, selectable above) and finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R XL media. Always test on your own device.</source>
+        <translation>Auf eigene Gefahr: Viele Blu-ray-Player können 100/128 GB BD-R XL Discs überhaupt nicht lesen, und es gibt keine Garantie, dass Ihrer das kann. Ein Image von etwa 66 GB (die ersten beiden Layer, oben auswählbar) und das Finalisieren der Disc verbessern die Chancen bei manchen Playern, aber auch 66 GB spielt nicht garantiert ab. Die vollen 100/128 GB erfordern einen aktuellen Player, der High-Capacity-BD-R-XL-Medien ausdrücklich unterstützt. Testen Sie immer auf Ihrem eigenen Gerät.</translation>
+    </message>
+    <message>
+        <source>Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. You are proceeding at your own risk.
+
+Keeping the image around 66 GB (the first two layers, selectable as its own disc entry) improves the odds on some players, but even 66 GB is not guaranteed to play. Test on your own device.
+
+Build the ISO anyway?</source>
+        <translation>Viele Blu-ray-Player können 100/128 GB BD-R XL Discs überhaupt nicht lesen, und es gibt keine Garantie, dass Ihrer das kann. Sie handeln auf eigene Gefahr.
+
+Ein Image von etwa 66 GB (die ersten beiden Layer, als eigener Disc-Eintrag auswählbar) verbessert die Chancen bei manchen Playern, aber auch 66 GB spielt nicht garantiert ab. Testen Sie auf Ihrem eigenen Gerät.
+
+ISO trotzdem erstellen?</translation>
+    </message>
+    <message>
+        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>Bei Auswahl eines Rohlings werden dessen Free Sectors unten vorab ausgefüllt. Prüfen Sie diesen Wert IMMER gegen den, den ImgBurn für Ihren eigenen Rohling anzeigt, denn dieselbe Disc-Größe gibt es mit zwei Kapazitäten: Eine Disc mit Fehlerverwaltung hält 1 GiB pro Layer als Ersatzbereich zurück und meldet stattdessen 47,305,728 (100 GB), 60,403,712 (128 GB) oder 23,652,352 (BD-RE DL). Weicht Ihrer ab, haken Sie "Free Sectors manuell eingeben" an und tragen Sie den Wert von ImgBurn ein: Der Layer-Break wird aus dieser Zahl berechnet, ein falscher Wert setzt den Schutz also an die falsche Stelle.</translation>
+    </message>
+    <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
         <source>Input</source>
         <translation>Eingabe</translation>

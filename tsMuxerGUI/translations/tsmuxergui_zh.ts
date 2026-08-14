@@ -2507,6 +2507,70 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Also fill before the break</source>
+        <translation>同时填充分层点之前的区域</translation>
+    </message>
+    <message>
+        <source>BD-R DL 50 GB, 2 layers (24,438,784 sectors)</source>
+        <translation>BD-R DL 50 GB，双层（24,438,784 个扇区）</translation>
+    </message>
+    <message>
+        <source>BD-RE DL 50 GB, 2 layers (23,652,352 sectors)</source>
+        <translation>BD-RE DL 50 GB，双层（23,652,352 个扇区）</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, 3 layers (48,878,592 sectors)</source>
+        <translation>BD-R XL 100 GB，3 层（48,878,592 个扇区）</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)</source>
+        <translation>BD-R XL 100 GB，仅前 2 层（32,585,728 个扇区）</translation>
+    </message>
+    <message>
+        <source>BD-R XL 128 GB, 4 layers (62,500,864 sectors)</source>
+        <translation>BD-R XL 128 GB，4 层（62,500,864 个扇区）</translation>
+    </message>
+    <message>
+        <source>How much to fill BEFORE the break. Only used when the box beside it is ticked.</source>
+        <translation>在分层点之前填充多少。仅在勾选旁边的复选框时才会使用。</translation>
+    </message>
+    <message>
+        <source>ImgBurn -&gt; Free Sectors (e.g. 48,878,592)</source>
+        <translation>ImgBurn -&gt; Free Sectors（例如 48,878,592）</translation>
+    </message>
+    <message>
+        <source>Layer break(s) at sector: %1</source>
+        <translation>分层点所在扇区: %1</translation>
+    </message>
+    <message>
+        <source>At your own risk: this is still BD-R XL media, which many Blu-ray players cannot read at all. Using only the first two layers and finalizing the disc improves the odds on some players, but nothing guarantees it. Always test on your own device.</source>
+        <translation>风险自负:这仍然是 BD-R XL 介质,许多 Blu-ray 播放机根本无法读取。仅使用前两层并对光盘执行终结可以提高在部分播放机上的成功率,但并不能保证。请务必在你自己的设备上测试。</translation>
+    </message>
+    <message>
+        <source>The guard normally goes entirely after the break, where discs fail most often. Switch this on to fill before it as well, for media that are also weak just before the transition. Both zones are set independently; this one costs that much more space.</source>
+        <translation>保护带通常全部放在分层点之后,那里是光盘最容易出问题的位置。如果介质在过渡之前也比较脆弱,可以打开此项,在分层点之前也进行填充。两个区域分别设置,这个区域会相应多占用一些空间。</translation>
+    </message>
+    <message>
+        <source>At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. Keeping the image around 66 GB (the first two layers, selectable above) and finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R XL media. Always test on your own device.</source>
+        <translation>风险自负:许多 Blu-ray 播放机根本无法读取 100/128 GB 的 BD-R XL 光盘,也无法保证你的播放机可以。将镜像控制在 66 GB 左右(前两层,可在上方选择)并对光盘执行终结,可以提高在部分播放机上的成功率,但即使 66 GB 也不保证能播放。完整的 100/128 GB 需要明确支持大容量 BD-R XL 介质的较新播放机。请务必在你自己的设备上测试。</translation>
+    </message>
+    <message>
+        <source>Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. You are proceeding at your own risk.
+
+Keeping the image around 66 GB (the first two layers, selectable as its own disc entry) improves the odds on some players, but even 66 GB is not guaranteed to play. Test on your own device.
+
+Build the ISO anyway?</source>
+        <translation>许多 Blu-ray 播放机根本无法读取 100/128 GB 的 BD-R XL 光盘,也无法保证你的播放机可以。继续即表示风险自负。
+
+将镜像控制在 66 GB 左右(前两层,可作为单独的光盘条目选择)可以提高在部分播放机上的成功率,但即使 66 GB 也不保证能播放。请在你自己的设备上测试。
+
+仍要生成 ISO 吗?</translation>
+    </message>
+    <message>
+        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>选择光盘后，下方会预填其 Free Sectors。请务必将该数值与 ImgBurn 为你自己的光盘显示的数值核对，因为同一容量的光盘存在两种 Free Sectors: 带缺陷管理的光盘会每层保留 1 GiB 作为备用区域，转而显示 47,305,728 (100 GB)、60,403,712 (128 GB) 或 23,652,352 (BD-RE DL)。如果你的光盘不同，请勾选"手动输入 Free Sectors"并填入 ImgBurn 显示的数值: 分层点由该数值计算得出，数值错误会把保护带放到错误的位置。</translation>
+    </message>
+    <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
         <source>Input</source>
         <translation>导入</translation>

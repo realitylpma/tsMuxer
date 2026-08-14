@@ -2507,6 +2507,70 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Also fill before the break</source>
+        <translation>Также заполнять перед разрывом</translation>
+    </message>
+    <message>
+        <source>BD-R DL 50 GB, 2 layers (24,438,784 sectors)</source>
+        <translation>BD-R DL 50 GB, 2 слоя (24,438,784 секторов)</translation>
+    </message>
+    <message>
+        <source>BD-RE DL 50 GB, 2 layers (23,652,352 sectors)</source>
+        <translation>BD-RE DL 50 GB, 2 слоя (23,652,352 секторов)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, 3 layers (48,878,592 sectors)</source>
+        <translation>BD-R XL 100 GB, 3 слоя (48,878,592 секторов)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)</source>
+        <translation>BD-R XL 100 GB, только первые 2 слоя (32,585,728 секторов)</translation>
+    </message>
+    <message>
+        <source>BD-R XL 128 GB, 4 layers (62,500,864 sectors)</source>
+        <translation>BD-R XL 128 GB, 4 слоя (62,500,864 секторов)</translation>
+    </message>
+    <message>
+        <source>How much to fill BEFORE the break. Only used when the box beside it is ticked.</source>
+        <translation>Сколько заполнять ПЕРЕД разрывом. Используется, только если отмечен флажок рядом.</translation>
+    </message>
+    <message>
+        <source>ImgBurn -&gt; Free Sectors (e.g. 48,878,592)</source>
+        <translation>ImgBurn -&gt; Free Sectors (например, 48,878,592)</translation>
+    </message>
+    <message>
+        <source>Layer break(s) at sector: %1</source>
+        <translation>Разрыв(ы) слоя в секторе: %1</translation>
+    </message>
+    <message>
+        <source>At your own risk: this is still BD-R XL media, which many Blu-ray players cannot read at all. Using only the first two layers and finalizing the disc improves the odds on some players, but nothing guarantees it. Always test on your own device.</source>
+        <translation>На ваш страх и риск: это по-прежнему носитель BD-R XL, который многие проигрыватели Blu-ray вообще не читают. Использование только первых двух слоёв и финализация диска повышают шансы на некоторых проигрывателях, но ничего не гарантируют. Всегда проверяйте на своём устройстве.</translation>
+    </message>
+    <message>
+        <source>The guard normally goes entirely after the break, where discs fail most often. Switch this on to fill before it as well, for media that are also weak just before the transition. Both zones are set independently; this one costs that much more space.</source>
+        <translation>Защита обычно размещается целиком после разрыва, где диски отказывают чаще всего. Включите это, чтобы заполнять и перед ним, для носителей, уязвимых также прямо перед переходом. Обе зоны задаются независимо; эта занимает соответственно дополнительное место.</translation>
+    </message>
+    <message>
+        <source>At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. Keeping the image around 66 GB (the first two layers, selectable above) and finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R XL media. Always test on your own device.</source>
+        <translation>На ваш страх и риск: многие проигрыватели Blu-ray вообще не читают диски BD-R XL на 100/128 GB, и нет гарантии, что ваш прочитает. Если удержать образ в пределах примерно 66 GB (первые два слоя, выбираются выше) и финализировать диск, на некоторых проигрывателях шансы выше, но даже 66 GB не гарантируют воспроизведение. Для полных 100/128 GB нужен современный проигрыватель с явной поддержкой ёмких носителей BD-R XL. Всегда проверяйте на своём устройстве.</translation>
+    </message>
+    <message>
+        <source>Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no guarantee yours will. You are proceeding at your own risk.
+
+Keeping the image around 66 GB (the first two layers, selectable as its own disc entry) improves the odds on some players, but even 66 GB is not guaranteed to play. Test on your own device.
+
+Build the ISO anyway?</source>
+        <translation>Многие проигрыватели Blu-ray вообще не читают диски BD-R XL на 100/128 GB, и нет гарантии, что ваш прочитает. Вы действуете на свой страх и риск.
+
+Если удержать образ в пределах примерно 66 GB (первые два слоя, выбираются отдельным пунктом списка дисков), на некоторых проигрывателях шансы выше, но даже 66 GB не гарантируют воспроизведение. Проверьте на своём устройстве.
+
+Всё равно создать ISO?</translation>
+    </message>
+    <message>
+        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>При выборе диска его значение Free Sectors заполняется ниже. ВСЕГДА сверяйте это число с тем, которое ImgBurn показывает для вашего диска, потому что один и тот же размер диска существует с двумя ёмкостями: диск с управлением дефектами удерживает 1 GiB на слой в качестве запасной области и показывает вместо этого 47,305,728 (100 GB), 60,403,712 (128 GB) или 23,652,352 (BD-RE DL). Если у вас другое значение, отметьте "Ввести Free Sectors вручную" и введите то, что показывает ImgBurn: точка разрыва слоя рассчитывается из этого числа, поэтому неверное значение поместит защиту не туда.</translation>
+    </message>
+    <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
         <source>Input</source>
         <translation>Источник</translation>
