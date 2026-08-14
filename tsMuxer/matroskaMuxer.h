@@ -127,6 +127,17 @@ class MatroskaMuxer final : public AbstractMuxer
         int channels;
         int bitDepth;
 
+        // A Blu-ray TrueHD stream is two things braided onto one PID: the lossless MLP frames and a
+        // 448 kbps AC-3 core beside them, so a player that cannot decode the lossless stream still
+        // has something to play. Matroska has no such arrangement, an A_TRUEHD track holds the
+        // lossless stream alone, so the core is carried as a track of its own instead of being
+        // discarded. On the TrueHD track ac3CoreStreamIndex names that companion; on the companion
+        // ac3CoreOfStream names the TrueHD track whose core it carries. dropAc3Core is the per track
+        // opt out for anyone who wants the lossless stream on its own.
+        int ac3CoreStreamIndex;
+        int ac3CoreOfStream;
+        bool dropAc3Core;
+
         // Codec-private data (built at openDstFile time)
         std::vector<uint8_t> codecPrivate;
 
@@ -168,6 +179,9 @@ class MatroskaMuxer final : public AbstractMuxer
               sampleRate(0),
               channels(0),
               bitDepth(0),
+              ac3CoreStreamIndex(-1),
+              ac3CoreOfStream(-1),
+              dropAc3Core(false),
               pendingPts(0),
               pendingFlags(0),
               hasPendingFrame(false),

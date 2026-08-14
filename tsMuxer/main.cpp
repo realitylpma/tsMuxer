@@ -429,6 +429,11 @@ Additional parameters for audio tracks:
                     Can be negative.
 - down-to-dts       Available only for DTS-HD tracks. Filter out HD part.
 - down-to-ac3       For TRUE-HD and E-AC3 (DD+) tracks. Keep the AC-3 core, drop the HD part.
+- drop-ac3-core     MKV output only. A Blu-ray TrueHD stream carries a 448 kbps AC-3 core beside its
+                    lossless part; Matroska cannot hold the two in one track, so the core is written
+                    as a track of its own and merge-ac3-track= puts them back together when the file
+                    is muxed to a disc again. Add this to leave the core out and keep the lossless
+                    stream alone, at the cost of not being able to author a spec-legal disc from it.
 - secondary         Mux as secondary audio. Available for DD+ and DTS-Express.
 - default           Mark this track as the default. Used for Blu-ray, and written as the
                     Matroska default flag when the output is MKV. Without it the first track
@@ -443,6 +448,8 @@ TrueHD + AC-3 core merge (MKV only):
                     TrueHD track for BD muxing. Requires track=<TrueHD track number>; do not add the AC-3 track as
                     a separate line in the meta file.
                     Example: A_MLP, "movie.mkv", track=2, merge-ac3-track=3
+An MKV that tsMuxeR wrote from a disc already holds that pair: the lossless track and the disc's own AC-3 core
+beside it, so the core is the real one and nothing has to be re-encoded.
 If the file has TrueHD but no AC-3 track, decode the TrueHD track to AC-3 with ffmpeg (pick the correct audio
 index for 0:a:N), for example:
     ffmpeg -i input.mkv -map 0:a:0 -c:a ac3 -b:a 640k -ac 6 compat.ac3

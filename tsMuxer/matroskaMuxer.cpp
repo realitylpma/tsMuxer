@@ -29,6 +29,10 @@
 #include "vvc.h"
 #include "vvcStreamReader.h"
 
+// Key for the AC-3 core companion of a TrueHD track (see refreshTrackProperties). Packets are
+// routed by real stream index, so the companion is keyed clear of every real one.
+static constexpr int AC3_CORE_STREAM_BASE = 0x40000000;
+
 using namespace std;
 
 // Divisor to convert from internal PTS frequency to milliseconds.
@@ -275,6 +279,7 @@ void MatroskaMuxer::intAddStream(const std::string& /*streamName*/, const std::s
         track.name = nm->second;
     // "default" already exists and is documented for Blu-ray; it just never reached Matroska.
     track.markedDefault = params.find("default") != params.end();
+    track.dropAc3Core = params.find("drop-ac3-core") != params.end();
 
     // Generate a random UID
     static std::mt19937_64 rng(std::random_device{}());
@@ -1079,6 +1084,65 @@ void MatroskaMuxer::refreshTrackProperties()
                    << ", with base layer, enhancement layer and RPU.");
     }
 
+    // A Blu-ray TrueHD track arrives as its lossless frames PLUS a 448 kbps AC-3 core, both on one
+    // PID, because a disc has to carry something for a player that cannot decode the lossless
+    // stream. Matroska has no such arrangement: an A_TRUEHD track holds the lossless stream alone,
+    // and an AC-3 frame sitting inside one is something a player will hand to an MLP decoder. The
+    // core was therefore dropped, which is what a Matroska player expects, but it also destroyed
+    // the only part a Blu-ray needs: authoring a disc back out of that file produced a stream the
+    // spec does not allow, and the audio could not be recovered from anywhere.
+    //
+    // So the core keeps its bytes and gets a track of its own, which is what the reference muxers
+    // write and what a disc remux normally looks like. merge-ac3-track= braids the two back onto
+    // one PID when the file is authored back to a disc, closing the round trip.
+    //
+    // This has to happen HERE rather than at intAddStream time: an AC-3 family reader has not seen
+    // a frame when the stream is added, so isTrueHD() is still false and no core would be found.
+    // The entries are collected first and inserted afterwards, because inserting into the map while
+    // walking it would let the walk reach the entries it is creating.
+    std::vector<std::pair<int, MkvTrackInfo>> coreTracks;
+    for (auto& [streamIdx, track] : m_tracks)
+    {
+        if (track.trackType != 2 || track.matroskaCodecID != MATROSKA_CODEC_ID_AUDIO_TRUEHD || track.dropAc3Core)
+            continue;
+        const auto ac3 = dynamic_cast<AC3Codec*>(track.codecReader);
+        // isTrueHD means "AC-3 core plus lossless", the disc arrangement, and it is the only case
+        // with a core to rescue. A TrueHD track read out of a Matroska file has none, and
+        // down-to-ac3 has already turned the whole thing into plain AC-3.
+        if (ac3 == nullptr || !ac3->isTrueHD() || ac3->getDownconvertToAC3())
+            continue;
+
+        MkvTrackInfo core;
+        // Real stream indexes are small and are what packets are routed by, so they cannot be
+        // renumbered to make room. The companion is keyed above every real one instead, which also
+        // places it after its TrueHD track in the file.
+        core.streamIndex = AC3_CORE_STREAM_BASE + streamIdx;
+        core.codecReader = track.codecReader;
+        core.codecID = CODEC_A_AC3;
+        core.matroskaCodecID = MATROSKA_CODEC_ID_AUDIO_AC3;
+        core.trackType = 2;
+        core.language = track.language;
+        // The rate and channel count read from an AC-3 family reader a few lines above describe the
+        // CORE, not the lossless stream, so they belong to this track rather than the one they were
+        // read onto.
+        core.sampleRate = track.sampleRate;
+        core.channels = track.channels;
+        core.markedDefault = false;
+        core.ac3CoreOfStream = streamIdx;
+        static std::mt19937_64 rng(std::random_device{}());
+        core.trackUID = rng();
+
+        track.ac3CoreStreamIndex = core.streamIndex;
+        coreTracks.emplace_back(core.streamIndex, core);
+
+        LTRACE(LT_INFO, 2,
+               "TrueHD: keeping the AC-3 compatibility core as its own track. Matroska cannot carry "
+               "it inside the lossless track the way a disc does, and dropping it would lose the "
+               "only part a Blu-ray needs. Use merge-ac3-track= to put them back on one stream when "
+               "authoring a disc from this file, or drop-ac3-core to leave the core out.");
+    }
+    for (auto& [key, core] : coreTracks) m_tracks[key] = core;
+
     // Track numbers are handed out as streams are added, so folding one away leaves a gap in the
     // sequence. A gap is legal, a track number is only an identifier, but renumbering costs nothing
     // at this point because no block has been written yet, and it keeps the file ordinary.
@@ -1702,8 +1766,9 @@ bool MatroskaMuxer::muxPacketInternal(AVPacket& avPacket)
     // A TrueHD track arrives as its lossless frames PLUS the AC-3 core frames, because a disc has
     // to carry both beside each other on one PID for a player that cannot decode the lossless
     // stream. Matroska has no such arrangement: an A_TRUEHD track holds the lossless stream alone,
-    // and an AC-3 frame sitting inside one is something a player will hand to an MLP decoder. Drop
-    // the core, which is what the reference muxers do and what a Matroska player expects.
+    // and an AC-3 frame sitting inside one is something a player will hand to an MLP decoder. So
+    // the core leaves this track, and unless it was turned down it is written to a track of its
+    // own (built in refreshTrackProperties) rather than thrown away.
     if (track.matroskaCodecID == MATROSKA_CODEC_ID_AUDIO_TRUEHD)
     {
         // Two core frames arrive WITHOUT the flag: the first one, before the reader's state machine
@@ -1719,7 +1784,17 @@ bool MatroskaMuxer::muxPacketInternal(AVPacket& avPacket)
         const bool isAc3Core =
             avPacket.size >= 2 && avPacket.data[0] == 0x0B && avPacket.data[1] == 0x77 && mlpLength != avPacket.size;
         if ((avPacket.flags & AVPacket::IS_CORE_PACKET) || isAc3Core)
-            return true;
+        {
+            if (track.ac3CoreStreamIndex < 0)
+                return true;
+            // Re-enter as an ordinary packet on the companion track. That track is A_AC3, so it
+            // cannot take this branch a second time, and the core flag is cleared so nothing
+            // downstream still reads it as part of a TrueHD stream.
+            AVPacket corePacket = avPacket;
+            corePacket.stream_index = track.ac3CoreStreamIndex;
+            corePacket.flags &= ~AVPacket::IS_CORE_PACKET;
+            return muxPacketInternal(corePacket);
+        }
     }
 
     // A folded Dolby Vision enhancement layer writes no block of its own. Its bytes are collected
