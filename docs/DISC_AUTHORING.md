@@ -84,8 +84,9 @@ BD-R XL 128 (4 layers): total / 4,  total * 2 / 4,  total * 3 / 4
 ```
 
 For a standard 50 GB BD DL that is `24,438,784 / 2 = 12,219,392` (25 GB per layer). For a
-100 GB BD-R XL with a total of `47,305,728`, the two breaks are `15,768,576` and
-`31,537,152`.
+100 GB BD-R XL with a total of `48,878,592`, the two breaks are `16,292,864` and
+`32,585,728`; the same disc defect-managed reports `47,305,728` and breaks at `15,768,576`
+and `31,537,152` instead, which is why the total has to come from the disc in the drive.
 
 ### The trap (read this)
 
@@ -197,19 +198,37 @@ The disc-type dropdown fills these blank-disc "Free Sectors" values (2048-byte s
 same numbers ImgBurn reports for a normal blank disc, and locks the field so the value cannot
 be changed by accident:
 
-| Disc | Free Sectors | Note |
-|------|-------------|------|
-| BD-R DL 50 GB | 24,438,784 | write-once, full capacity |
-| BD-RE DL 50 GB | 23,652,352 | rewritable, reserves defect-management spare |
-| BD-R XL 100 GB | 47,305,728 | BDXL, defect-managed |
-| BD-R XL 128 GB | 60,403,712 | BDXL, defect-managed |
+| Disc | Free Sectors | Layers used | Note |
+|------|-------------|-------------|------|
+| BD-R DL 50 GB | 24,438,784 | 2 | write-once, full capacity |
+| BD-RE DL 50 GB | 23,652,352 | 2 | rewritable, reserves defect-management spare |
+| BD-R XL 100 GB | 48,878,592 | 3 | BDXL, full capacity |
+| BD-R XL 100 GB, first 2 layers only | 32,585,728 | 2 | 66 GB on a 100 GB disc |
+| BD-R XL 128 GB | 62,500,864 | 4 | BDXL, full capacity |
 
-These are the defect-managed (normal) capacities. The numbers are facts about the media: they
-were read from real Verbatim discs (ImgBurn "Free Sectors") and match the Blu-ray/BDXL spec. A
-disc burned WITHOUT defect-management formatting has a larger full capacity (for example
-48,878,592 for 100 GB or 62,500,864 for 128 GB); if ImgBurn shows one of those for your disc,
-tick **Enter Free Sectors manually (advanced)** and type it. BD-RE capacity in particular
-depends on how the disc was formatted, which is why the field can be unlocked.
+**Check the number against your own disc.** The same disc size exists at two capacities,
+and the layer break is worked out from whichever number is in the field, so the wrong one
+puts the guard in the wrong place. A defect-managed disc keeps 1 GiB per layer back as
+ISA/OSA spare area and reports **47,305,728** (100 GB), **60,403,712** (128 GB) or
+**23,652,352** (BD-RE DL) instead. Both kinds have been measured here on real discs, so
+neither can be assumed. If ImgBurn shows something other than the pre-filled value, tick
+**Enter Free Sectors manually (advanced)** and type what ImgBurn shows.
+
+On a 100 GB disc, one GiB per layer is 524,288 sectors, so taking the wrong one of the two
+100 GB figures moves the calculated break a full GiB away from the real one, which is far
+more than any guard band covers.
+
+### 66 GB on a 100 GB disc
+
+There is no 66 GB BD-R, and many players cope with two layers better than three, so a
+100 GB disc used across its first two layers is a common compromise. That is what the
+**first 2 layers only** entry is for: two thirds of the disc, which puts its single break
+on the disc's real first layer boundary (`48,878,592 / 3 = 16,292,864`, and
+`32,585,728 / 2` is the same sector), and leaves the third layer unwritten. The fit
+estimate and the layer-fit placement treat the disc as 66 GB, and `--inner-only` pads to
+66 GB rather than to the full disc.
+
+It is still BD-R XL media, so the player-compatibility warning still applies.
 
 ## Defect-managed discs (measured on real hardware)
 

@@ -90,8 +90,9 @@ BD-R XL 128 (4 Layer): Gesamt / 4,  Gesamt * 2 / 4,  Gesamt * 3 / 4
 ```
 
 Für eine Standard-50-GB-BD-DL ist das `24.438.784 / 2 = 12.219.392` (25 GB pro Layer). Bei
-einer 100-GB-BD-R-XL mit Gesamt `47.305.728` sind die beiden Breaks `15.768.576` und
-`31.537.152`.
+einer 100-GB-BD-R-XL mit Gesamt `48.878.592` sind die beiden Breaks `16.292.864` und
+`32.585.728`; dieselbe Disc mit Fehlerverwaltung meldet `47.305.728` und bricht bei
+`15.768.576` und `31.537.152`. Deshalb muss die Gesamtzahl von der Disc im Laufwerk kommen.
 
 ### Die Falle (unbedingt beachten)
 
@@ -219,20 +220,39 @@ Die Disc-Typ-Auswahl trägt diese „Free Sectors" einer leeren Disc ein (2048-B
 dieselben Zahlen, die ImgBurn für eine normale leere Disc anzeigt, und sperrt das Feld, damit
 der Wert nicht versehentlich geändert wird:
 
-| Disc | Free Sectors | Hinweis |
-|------|-------------|---------|
-| BD-R DL 50 GB | 24.438.784 | einmal beschreibbar, volle Kapazität |
-| BD-RE DL 50 GB | 23.652.352 | wiederbeschreibbar, reserviert Ersatzbereich für die Fehlerverwaltung |
-| BD-R XL 100 GB | 47.305.728 | BDXL, mit Fehlerverwaltung |
-| BD-R XL 128 GB | 60.403.712 | BDXL, mit Fehlerverwaltung |
+| Disc | Free Sectors | Genutzte Layer | Hinweis |
+|------|-------------|------|---------|
+| BD-R DL 50 GB | 24.438.784 | 2 | einmal beschreibbar, volle Kapazität |
+| BD-RE DL 50 GB | 23.652.352 | 2 | wiederbeschreibbar, reserviert Ersatzbereich für die Fehlerverwaltung |
+| BD-R XL 100 GB | 48.878.592 | 3 | BDXL, volle Kapazität |
+| BD-R XL 100 GB, nur die ersten 2 Layer | 32.585.728 | 2 | 66 GB auf einer 100-GB-Disc |
+| BD-R XL 128 GB | 62.500.864 | 4 | BDXL, volle Kapazität |
 
-Das sind die (normalen) Kapazitäten mit Fehlerverwaltung. Die Zahlen sind Fakten über das
-Medium: Sie wurden von echten Verbatim-Discs abgelesen (ImgBurn „Free Sectors") und stimmen
-mit der Blu-ray/BDXL-Spezifikation überein. Eine OHNE Fehlerverwaltungs-Formatierung
-gebrannte Disc hat eine größere volle Kapazität (zum Beispiel 48.878.592 bei 100 GB oder
-62.500.864 bei 128 GB); zeigt ImgBurn eine davon für deine Disc an, setze das Häkchen bei
-**Enter Free Sectors manually (advanced)** und gib sie ein. Besonders die BD-RE-Kapazität
-hängt davon ab, wie die Disc formatiert wurde, weshalb sich das Feld entsperren lässt.
+**Gleiche die Zahl mit deiner eigenen Disc ab.** Dieselbe Disc-Größe gibt es mit zwei
+verschiedenen Kapazitäten, und der Layer-Break wird aus genau der Zahl im Feld berechnet:
+die falsche setzt die Schutzzone an die falsche Stelle. Eine Disc mit Fehlerverwaltung hält
+1 GiB pro Layer als ISA/OSA-Ersatzbereich zurück und meldet stattdessen **47.305.728**
+(100 GB), **60.403.712** (128 GB) oder **23.652.352** (BD-RE DL). Beide Varianten wurden
+hier auf echten Discs gemessen, keine davon lässt sich voraussetzen. Zeigt ImgBurn etwas
+anderes als den eingetragenen Wert, setze das Häkchen bei **Enter Free Sectors manually
+(advanced)** und gib die Zahl von ImgBurn ein.
+
+Auf einer 100-GB-Disc entspricht 1 GiB pro Layer 524.288 Sektoren. Die falsche der beiden
+100-GB-Zahlen verschiebt den berechneten Break also um ein volles GiB gegenüber dem echten,
+weit mehr, als jede Schutzzone abdeckt.
+
+### 66 GB auf einer 100-GB-Disc
+
+Eine 66-GB-BD-R gibt es nicht, und viele Player kommen mit zwei Layern besser zurecht als
+mit drei. Eine 100-GB-Disc nur über ihre ersten beiden Layer zu nutzen, ist deshalb ein
+verbreiteter Kompromiss. Genau dafür ist der Eintrag **nur die ersten 2 Layer** da: zwei
+Drittel der Disc, wodurch der eine benötigte Break auf der echten ersten Layer-Grenze der
+Disc liegt (`48.878.592 / 3 = 16.292.864`, und `32.585.728 / 2` ist derselbe Sektor), und
+der dritte Layer bleibt unbeschrieben. Die Platzabschätzung und die Layer-Fit-Platzierung
+behandeln die Disc als 66-GB-Disc, und `--inner-only` füllt auf 66 GB statt auf die ganze
+Disc auf.
+
+Es bleibt BD-R-XL-Medium, die Warnung zur Player-Kompatibilität gilt also weiterhin.
 
 ## Discs mit Fehlerverwaltung (auf echter Hardware gemessen)
 

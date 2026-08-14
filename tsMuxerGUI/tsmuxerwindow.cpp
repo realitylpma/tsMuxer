@@ -634,27 +634,50 @@ TsMuxerWindow::TsMuxerWindow()
         fitLabel->setWordWrap(true);
         // --- Layer-break calculator: disc type + ImgBurn "Free Sectors" -> break(s), auto-filled ---
         auto* discTypeCombo = new QComboBox(bdmvTab);
-        // Item data: UserRole = layer count (drives the break calculation); UserRole+1 = the disc's standard
-        // blank Free Sectors, pre-filled into the (locked) field below. These are the values ImgBurn reports for
-        // a blank disc: BD-R DL presents the full capacity, while BD-RE (spare area) and BDXL 100/128 GB
-        // (mandatory ISA/OSA spare) are defect-managed and a little smaller - which is why BD-R DL and BD-RE DL
-        // are separate entries. These numbers are facts about the physical media: they were read from real
-        // Verbatim discs (ImgBurn "Free Sectors") and match the Blu-ray/BDXL spec. The larger
-        // no-defect-management capacities (48,878,592 for 100 GB, 62,500,864 for 128 GB) appear only when a
-        // disc is burned without defect-management formatting.
-        discTypeCombo->addItem(tr("BD-R DL 50 GB (2 layers)"), 2);
+        // Item data: UserRole = how many layers to lay the data across (drives the break calculation);
+        // UserRole+1 = the Free Sectors pre-filled into the (locked) field below; UserRole+2 = 1 for BD-R XL
+        // media, which decides the player-compatibility warning and cannot be read off the layer count once
+        // a two-layer XL entry exists; UserRole+3 = the capacity band the value belongs to, used to spot a
+        // Free Sectors figure that does not match the disc picked.
+        //
+        // The number is written into the label so it can be matched against ImgBurn at a glance, because the
+        // same disc size exists at two different capacities and picking the wrong one puts the guard in the
+        // wrong place. A BD-R XL reports its full capacity, while a defect-managed disc keeps 1 GiB per layer
+        // back as ISA/OSA spare and reports 47,305,728 (100 GB) or 60,403,712 (128 GB) instead. Both have been
+        // measured here on real discs, so neither can be assumed: the field is unlockable for exactly that.
+        // BD-RE reserves spare area as well, which is why BD-R DL and BD-RE DL are separate entries.
+        //
+        // The two-layer 100 GB entry is for a 66 GB burn on a 100 GB disc, which exists because there is no
+        // 66 GB BD-R and because many players handle two layers better than three. It is two thirds of the
+        // disc, so the one break it needs falls on the disc's real first layer boundary, and the third layer
+        // is never written.
+        discTypeCombo->addItem(tr("BD-R DL 50 GB, 2 layers (24,438,784 sectors)"), 2);
         discTypeCombo->setItemData(0, 24438784, Qt::UserRole + 1);
-        discTypeCombo->addItem(tr("BD-RE DL 50 GB (2 layers)"), 2);
+        discTypeCombo->setItemData(0, 0, Qt::UserRole + 2);
+        discTypeCombo->setItemData(0, QStringLiteral("50 GB"), Qt::UserRole + 3);
+        discTypeCombo->addItem(tr("BD-RE DL 50 GB, 2 layers (23,652,352 sectors)"), 2);
         discTypeCombo->setItemData(1, 23652352, Qt::UserRole + 1);
-        discTypeCombo->addItem(tr("BD-R XL 100 GB (3 layers)"), 3);
-        discTypeCombo->setItemData(2, 47305728, Qt::UserRole + 1);
-        discTypeCombo->addItem(tr("BD-R XL 128 GB (4 layers)"), 4);
-        discTypeCombo->setItemData(3, 60403712, Qt::UserRole + 1);
+        discTypeCombo->setItemData(1, 0, Qt::UserRole + 2);
+        discTypeCombo->setItemData(1, QStringLiteral("50 GB"), Qt::UserRole + 3);
+        discTypeCombo->addItem(tr("BD-R XL 100 GB, 3 layers (48,878,592 sectors)"), 3);
+        discTypeCombo->setItemData(2, 48878592, Qt::UserRole + 1);
+        discTypeCombo->setItemData(2, 1, Qt::UserRole + 2);
+        discTypeCombo->setItemData(2, QStringLiteral("100 GB"), Qt::UserRole + 3);
+        discTypeCombo->addItem(tr("BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)"), 2);
+        discTypeCombo->setItemData(3, 32585728, Qt::UserRole + 1);
+        discTypeCombo->setItemData(3, 1, Qt::UserRole + 2);
+        discTypeCombo->setItemData(3, QStringLiteral("66 GB"), Qt::UserRole + 3);
+        discTypeCombo->addItem(tr("BD-R XL 128 GB, 4 layers (62,500,864 sectors)"), 4);
+        discTypeCombo->setItemData(4, 62500864, Qt::UserRole + 1);
+        discTypeCombo->setItemData(4, 1, Qt::UserRole + 2);
+        discTypeCombo->setItemData(4, QStringLiteral("128 GB"), Qt::UserRole + 3);
         discTypeCombo->setToolTip(
-            wrapTip(tr("Picking a disc pre-fills its standard Free Sectors below; you can still edit it. Write-once "
-                       "BD-R uses the full capacity, rewritable BD-RE reserves spare area and is a little smaller. "
-                       "BD-RE capacity also depends on how the disc was formatted, so if ImgBurn shows a different "
-                       "Free Sectors for your disc, use that value.")));
+            wrapTip(tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
+                       "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
+                       "defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 "
+                       "(100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "
+                       "\"Enter Free Sectors manually\" and type what ImgBurn shows: the layer break is worked out "
+                       "from that number, so a wrong one puts the guard in the wrong place.")));
         auto* freeSectorsEdit = new QLineEdit(bdmvTab);
         freeSectorsEdit->setPlaceholderText(tr("ImgBurn -> Free Sectors (e.g. 47,305,728)"));
         // Accept the number exactly as ImgBurn prints it: grouped with commas, dots or spaces (locale-agnostic).
@@ -751,13 +774,15 @@ TsMuxerWindow::TsMuxerWindow()
                     looksLike = QStringLiteral("25 GB");
                 else if (total >= 20000000 && total <= 28000000)
                     looksLike = QStringLiteral("50 GB");
+                else if (total >= 28000000 && total < 42000000)
+                    looksLike = QStringLiteral("66 GB");
                 else if (total >= 42000000 && total <= 52000000)
                     looksLike = QStringLiteral("100 GB");
                 else if (total >= 56000000 && total <= 68000000)
                     looksLike = QStringLiteral("128 GB");
-                const QString selected = layers == 2   ? QStringLiteral("50 GB")
-                                         : layers == 3 ? QStringLiteral("100 GB")
-                                                       : QStringLiteral("128 GB");
+                // Taken from the entry itself rather than from the layer count, which no longer identifies a
+                // disc now that a 100 GB disc can be used across two layers.
+                const QString selected = discTypeCombo->currentData(Qt::UserRole + 3).toString();
                 if (looksLike.isEmpty())
                     warns << tr("%1 sectors does not match any standard BD disc size. Double-check the Free "
                                 "Sectors value against ImgBurn.")
@@ -776,13 +801,20 @@ TsMuxerWindow::TsMuxerWindow()
                                  .arg(layers);
             }
             divisLabel->setText(warns.join("\n\n"));
+            // The media decides this, not the layer count: a 100 GB disc used across two layers is still a
+            // BD-R XL and still needs a player that can read one.
             compatLabel->setText(
-                layers >= 3
-                    ? tr("At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and "
-                         "there is no guarantee yours will. Keeping the image around 66 GB (the first two layers) and "
-                         "finalizing the disc improves the odds on some players, but even 66 GB is not guaranteed to "
-                         "play. The full 100/128 GB needs a recent player that explicitly supports high-capacity BD-R "
-                         "XL media. Always test on your own device.")
+                discTypeCombo->currentData(Qt::UserRole + 2).toInt() == 1
+                    ? (layers >= 3
+                           ? tr("At your own risk: many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, "
+                                "and there is no guarantee yours will. Keeping the image around 66 GB (the first two "
+                                "layers, selectable above) and finalizing the disc improves the odds on some players, "
+                                "but even 66 GB is not guaranteed to play. The full 100/128 GB needs a recent player "
+                                "that explicitly supports high-capacity BD-R XL media. Always test on your own "
+                                "device.")
+                           : tr("At your own risk: this is still BD-R XL media, which many Blu-ray players cannot "
+                                "read at all. Using only the first two layers and finalizing the disc improves the "
+                                "odds on some players, but nothing guarantees it. Always test on your own device."))
                     : QString());
         };
         // Pre-fill the standard Free Sectors for the selected disc so the user does not have to run ImgBurn for a
@@ -1121,16 +1153,19 @@ TsMuxerWindow::TsMuxerWindow()
                 isoBtn->setText(tr("Browse..."));
                 helpBtn->setText(tr("Where do I find this?"));
                 buildBtn->setText(tr("Build ISO"));
-                discTypeCombo->setItemText(0, tr("BD-R DL 50 GB (2 layers)"));
-                discTypeCombo->setItemText(1, tr("BD-RE DL 50 GB (2 layers)"));
-                discTypeCombo->setItemText(2, tr("BD-R XL 100 GB (3 layers)"));
-                discTypeCombo->setItemText(3, tr("BD-R XL 128 GB (4 layers)"));
+                discTypeCombo->setItemText(0, tr("BD-R DL 50 GB, 2 layers (24,438,784 sectors)"));
+                discTypeCombo->setItemText(1, tr("BD-RE DL 50 GB, 2 layers (23,652,352 sectors)"));
+                discTypeCombo->setItemText(2, tr("BD-R XL 100 GB, 3 layers (48,878,592 sectors)"));
+                discTypeCombo->setItemText(3, tr("BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)"));
+                discTypeCombo->setItemText(4, tr("BD-R XL 128 GB, 4 layers (62,500,864 sectors)"));
                 discTypeCombo->setToolTip(wrapTip(
-                    tr("Picking a disc pre-fills its standard Free Sectors below; you can still edit it. Write-once "
-                       "BD-R uses the full capacity, rewritable BD-RE reserves spare area and is a little smaller. "
-                       "BD-RE capacity also depends on how the disc was formatted, so if ImgBurn shows a different "
-                       "Free Sectors for your disc, use that value.")));
-                freeSectorsEdit->setPlaceholderText(tr("ImgBurn -> Free Sectors (e.g. 47,305,728)"));
+                    tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
+                       "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
+                       "defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 "
+                       "(100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "
+                       "\"Enter Free Sectors manually\" and type what ImgBurn shows: the layer break is worked out "
+                       "from that number, so a wrong one puts the guard in the wrong place.")));
+                freeSectorsEdit->setPlaceholderText(tr("ImgBurn -> Free Sectors (e.g. 48,878,592)"));
                 orderCheck->setText(tr("Keep original file order (seamless branching)"));
                 orderCheck->setToolTip(wrapTip(
                     tr("Files are normally written largest first, so the main movie sits on the layer break and "
@@ -1269,13 +1304,14 @@ TsMuxerWindow::TsMuxerWindow()
                                             "break can be calculated for the exact disc you are burning."));
                     return;
                 }
-                if (discTypeCombo->currentData().toInt() >= 3 &&
+                if (discTypeCombo->currentData(Qt::UserRole + 2).toInt() == 1 &&
                     QMessageBox::warning(
                         this, tr("BD-R XL - read at your own risk"),
                         tr("Many Blu-ray players cannot read 100/128 GB BD-R XL discs at all, and there is no "
                            "guarantee yours will. You are proceeding at your own risk.\n\n"
-                           "Keeping the image around 66 GB (the first two layers) improves the odds on some "
-                           "players, but even 66 GB is not guaranteed to play. Test on your own device.\n\n"
+                           "Keeping the image around 66 GB (the first two layers, selectable as its own disc "
+                           "entry) improves the odds on some players, but even 66 GB is not guaranteed to play. "
+                           "Test on your own device.\n\n"
                            "Build the ISO anyway?"),
                         QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
                     return;
