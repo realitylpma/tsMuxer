@@ -908,15 +908,27 @@ void MatroskaMuxer::writeTracks()
 {
     m_tracksPos = m_file.pos() - m_segmentStartPos;
 
-    // Build all track entries
-    std::vector<uint8_t> allEntries;
-    for (auto& [streamIdx, track] : m_tracks)
+    // Build all track entries, in TRACK NUMBER order rather than in map order. The map is keyed by
+    // stream index because that is what packets are routed by, and the AC-3 core companion of a
+    // TrueHD track is keyed above every real stream to stay clear of them, which would otherwise put
+    // it at the end of the file behind the subtitles. It belongs directly after the track it was
+    // taken from, which is where a disc remux carries it.
+    std::vector<const MkvTrackInfo*> ordered;
+    ordered.reserve(m_tracks.size());
+    for (const auto& [streamIdx, track] : m_tracks)
     {
         // A Dolby Vision enhancement layer folded into its base track is not a track of its own.
         if (track.dvMergedIntoStream >= 0)
             continue;
+        ordered.push_back(&track);
+    }
+    std::sort(ordered.begin(), ordered.end(),
+              [](const MkvTrackInfo* a, const MkvTrackInfo* b) { return a->trackNumber < b->trackNumber; });
 
-        std::vector<uint8_t> entryContent = buildTrackEntry(track);
+    std::vector<uint8_t> allEntries;
+    for (const auto* trackPtr : ordered)
+    {
+        std::vector<uint8_t> entryContent = buildTrackEntry(*trackPtr);
 
         // Write TrackEntry master header + content
         uint8_t header[16];
@@ -1148,8 +1160,22 @@ void MatroskaMuxer::refreshTrackProperties()
     // at this point because no block has been written yet, and it keeps the file ordinary.
     int nextNumber = 1;
     for (auto& [streamIdx, track] : m_tracks)
-        if (track.dvMergedIntoStream < 0)
-            track.trackNumber = nextNumber++;
+    {
+        if (track.dvMergedIntoStream >= 0 || track.ac3CoreOfStream >= 0)
+            continue;
+        track.trackNumber = nextNumber++;
+        // The core takes the number straight after the track it came from, so it sits beside it
+        // rather than after every other stream. Its map key cannot express that, because the key is
+        // what packets are routed by, so the numbering carries it and writeTracks writes in that
+        // order. This matches how a disc remux is normally laid out: lossless track, then its core,
+        // then the disc's other audio.
+        if (track.ac3CoreStreamIndex >= 0)
+        {
+            const auto core = m_tracks.find(track.ac3CoreStreamIndex);
+            if (core != m_tracks.end())
+                core->second.trackNumber = nextNumber++;
+        }
+    }
 }
 
 void MatroskaMuxer::writeDeferredHeader()

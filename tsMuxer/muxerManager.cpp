@@ -540,6 +540,15 @@ void MuxerManager::parseMuxOpt(const string& opts)
                 THROW(ERR_COMMON,
                       "Invalid --layer-break-guard value '" << paramPair[1] << "'. Expected 0..1024 (megabytes).");
         }
+        else if (paramPair[0] == "--layer-break-guard-before")
+        {
+            if (paramPair.size() < 2)
+                THROW(ERR_COMMON, "Missing value for " << paramPair[0]);
+            m_layerBreakGuardBeforeMB = strToInt32(paramPair[1]);
+            if (m_layerBreakGuardBeforeMB < 0 || m_layerBreakGuardBeforeMB > 1024)
+                THROW(ERR_COMMON, "Invalid --layer-break-guard-before value '"
+                                      << paramPair[1] << "'. Expected 0..1024 (megabytes).");
+        }
         else if (paramPair[0] == "--layer-break-lbn")
         {
             if (paramPair.size() < 2)

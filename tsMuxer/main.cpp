@@ -1389,7 +1389,7 @@ int main(int argc, char** argv)
                 }
                 if (!blurayHelper.open(dstFile, dt, muxerManager.totalSize(), muxerManager.getExtraISOBlocks(),
                                        muxerManager.useReproducibleIsoHeader(), muxerManager.getLayerBreakGuardMB(),
-                                       muxerManager.getLayerBreakLbns()))
+                                       muxerManager.getLayerBreakLbns(), muxerManager.getLayerBreakGuardBeforeMB()))
                     throw runtime_error(string("Can't create output file ") + dstFile);
                 blurayHelper.setVolumeLabel(isoDiskLabel);
                 blurayHelper.createBluRayDirs();

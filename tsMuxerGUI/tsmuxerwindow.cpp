@@ -380,6 +380,59 @@ QString TsMuxerWindow::getDefaultOutputFileName() const
 // wrapper turns on word wrapping without touching the translated strings themselves.
 static QString wrapTip(const QString& text) { return QStringLiteral("<p>") + text + QStringLiteral("</p>"); }
 
+// ── The disc table, in ONE place ─────────────────────────────────────────────────────────────
+// Two parts of the interface need it: the "BDMV folder -> ISO" tab, which works out the layer
+// break from it, and the dual-layer group beside the normal Blu-ray output, which used to carry
+// its own much cruder list (BD25/BD50/BD100/BD128 with no capacities at all) and therefore put
+// the guard at the BD-R DL break on every disc, including 100 and 128 GB ones where that sector
+// is not a layer boundary at all. Sharing the table is what keeps the two honest.
+//
+// The Free Sectors are what ImgBurn reports and what the layer break is computed from, so they
+// appear in the label as well: the same disc size exists at two capacities, a defect-managed
+// disc holding 1 GiB per layer back as ISA/OSA spare and reporting 47,305,728 (100 GB),
+// 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. Both kinds have been measured on real
+// discs, so neither can be assumed, and picking the wrong one moves the break a whole GiB, far
+// outside any guard band. These full capacities are also exactly what the engine's own BD25/BD50/
+// BD100/BD128 constants have always used (vod_common.h), so the two now agree.
+struct DiscEntry
+{
+    const char* label;   // shown in both combos, capacity included so it can be matched to ImgBurn
+    qint64 freeSectors;  // 2048-byte sectors
+    int layers;          // how many layers the data is laid across (breaks = layers - 1)
+    bool isXL;           // BD-R XL media: drives the player-compatibility warning
+    const char* band;    // capacity band name, for spotting a Free Sectors value that disagrees
+};
+
+static const DiscEntry* discTable(int& count)
+{
+    static const DiscEntry entries[] = {
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD-R DL 50 GB, 2 layers (24,438,784 sectors)"), 24438784, 2, false,
+         "50 GB"},
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD-RE DL 50 GB, 2 layers (23,652,352 sectors)"), 23652352, 2, false,
+         "50 GB"},
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD-R XL 100 GB, 3 layers (48,878,592 sectors)"), 48878592, 3, true,
+         "100 GB"},
+        // 66 GB on a 100 GB disc: there is no 66 GB BD-R and many players cope with two layers
+        // better than three. Two thirds of the disc, so its one break falls on the disc's real
+        // first layer boundary and the third layer is never written.
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)"), 32585728, 2,
+         true, "66 GB"},
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD-R XL 128 GB, 4 layers (62,500,864 sectors)"), 62500864, 4, true,
+         "128 GB"},
+    };
+    count = static_cast<int>(sizeof(entries) / sizeof(entries[0]));
+    return entries;
+}
+
+// The break sector(s) for a disc: every layer boundary except the last, which has no data after it.
+static QList<qint64> discBreaks(qint64 freeSectors, int layers)
+{
+    QList<qint64> breaks;
+    if (freeSectors > 0)
+        for (int k = 1; k < layers; ++k) breaks << freeSectors * k / layers;
+    return breaks;
+}
+
 TsMuxerWindow::TsMuxerWindow()
     : ui(new Ui::TsMuxerWindow),
       disableUpdatesCnt(0),
@@ -651,26 +704,17 @@ TsMuxerWindow::TsMuxerWindow()
         // 66 GB BD-R and because many players handle two layers better than three. It is two thirds of the
         // disc, so the one break it needs falls on the disc's real first layer boundary, and the third layer
         // is never written.
-        discTypeCombo->addItem(tr("BD-R DL 50 GB, 2 layers (24,438,784 sectors)"), 2);
-        discTypeCombo->setItemData(0, 24438784, Qt::UserRole + 1);
-        discTypeCombo->setItemData(0, 0, Qt::UserRole + 2);
-        discTypeCombo->setItemData(0, QStringLiteral("50 GB"), Qt::UserRole + 3);
-        discTypeCombo->addItem(tr("BD-RE DL 50 GB, 2 layers (23,652,352 sectors)"), 2);
-        discTypeCombo->setItemData(1, 23652352, Qt::UserRole + 1);
-        discTypeCombo->setItemData(1, 0, Qt::UserRole + 2);
-        discTypeCombo->setItemData(1, QStringLiteral("50 GB"), Qt::UserRole + 3);
-        discTypeCombo->addItem(tr("BD-R XL 100 GB, 3 layers (48,878,592 sectors)"), 3);
-        discTypeCombo->setItemData(2, 48878592, Qt::UserRole + 1);
-        discTypeCombo->setItemData(2, 1, Qt::UserRole + 2);
-        discTypeCombo->setItemData(2, QStringLiteral("100 GB"), Qt::UserRole + 3);
-        discTypeCombo->addItem(tr("BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)"), 2);
-        discTypeCombo->setItemData(3, 32585728, Qt::UserRole + 1);
-        discTypeCombo->setItemData(3, 1, Qt::UserRole + 2);
-        discTypeCombo->setItemData(3, QStringLiteral("66 GB"), Qt::UserRole + 3);
-        discTypeCombo->addItem(tr("BD-R XL 128 GB, 4 layers (62,500,864 sectors)"), 4);
-        discTypeCombo->setItemData(4, 62500864, Qt::UserRole + 1);
-        discTypeCombo->setItemData(4, 1, Qt::UserRole + 2);
-        discTypeCombo->setItemData(4, QStringLiteral("128 GB"), Qt::UserRole + 3);
+        {
+            int discCount = 0;
+            const DiscEntry* discs = discTable(discCount);
+            for (int i = 0; i < discCount; ++i)
+            {
+                discTypeCombo->addItem(tr(discs[i].label), discs[i].layers);
+                discTypeCombo->setItemData(i, discs[i].freeSectors, Qt::UserRole + 1);
+                discTypeCombo->setItemData(i, discs[i].isXL ? 1 : 0, Qt::UserRole + 2);
+                discTypeCombo->setItemData(i, QString::fromLatin1(discs[i].band), Qt::UserRole + 3);
+            }
+        }
         discTypeCombo->setToolTip(
             wrapTip(tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
                        "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
@@ -742,10 +786,8 @@ TsMuxerWindow::TsMuxerWindow()
         auto breaksList = [discTypeCombo, readFreeSectors]() -> QStringList
         {
             QStringList parts;
-            const int layers = discTypeCombo->currentData().toInt();
-            const qint64 total = readFreeSectors();
-            if (total > 0)
-                for (int k = 1; k < layers; ++k) parts << QString::number(total * k / layers);
+            for (const qint64 b : discBreaks(readFreeSectors(), discTypeCombo->currentData().toInt()))
+                parts << QString::number(b);
             return parts;
         };
         auto refresh = [breaksList, readFreeSectors, discTypeCombo, breaksLabel, compatLabel, divisLabel]()
@@ -1153,11 +1195,9 @@ TsMuxerWindow::TsMuxerWindow()
                 isoBtn->setText(tr("Browse..."));
                 helpBtn->setText(tr("Where do I find this?"));
                 buildBtn->setText(tr("Build ISO"));
-                discTypeCombo->setItemText(0, tr("BD-R DL 50 GB, 2 layers (24,438,784 sectors)"));
-                discTypeCombo->setItemText(1, tr("BD-RE DL 50 GB, 2 layers (23,652,352 sectors)"));
-                discTypeCombo->setItemText(2, tr("BD-R XL 100 GB, 3 layers (48,878,592 sectors)"));
-                discTypeCombo->setItemText(3, tr("BD-R XL 100 GB, first 2 layers only (32,585,728 sectors)"));
-                discTypeCombo->setItemText(4, tr("BD-R XL 128 GB, 4 layers (62,500,864 sectors)"));
+                int discCount = 0;
+                const DiscEntry* discs = discTable(discCount);
+                for (int i = 0; i < discCount; ++i) discTypeCombo->setItemText(i, tr(discs[i].label));
                 discTypeCombo->setToolTip(wrapTip(
                     tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
                        "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
@@ -1375,7 +1415,24 @@ TsMuxerWindow::TsMuxerWindow()
         auto* dl = new QGridLayout(dlBox);
         auto* discSizeCombo = new QComboBox(dlBox);
         discSizeCombo->setObjectName("dlDiscSize");
-        discSizeCombo->addItems(QStringList() << tr("Off") << "BD25" << "BD50" << "BD100" << "BD128");
+        // The same disc table the BDMV -> ISO tab uses. It used to be a bare BD25/BD50/BD100/BD128
+        // list with no capacities behind it, so the guard was placed at the BD-R DL break whatever
+        // was selected: on a 100 or 128 GB disc that sector is not a layer boundary at all and the
+        // guard protected nothing. Item data mirrors the other combo: UserRole = layers,
+        // UserRole+1 = Free Sectors, UserRole+2 = is BD-R XL, UserRole+3 = capacity band.
+        discSizeCombo->addItem(tr("Off"), 0);
+        discSizeCombo->setItemData(0, 0, Qt::UserRole + 1);
+        {
+            int discCount = 0;
+            const DiscEntry* discs = discTable(discCount);
+            for (int i = 0; i < discCount; ++i)
+            {
+                discSizeCombo->addItem(tr(discs[i].label), discs[i].layers);
+                discSizeCombo->setItemData(i + 1, discs[i].freeSectors, Qt::UserRole + 1);
+                discSizeCombo->setItemData(i + 1, discs[i].isXL ? 1 : 0, Qt::UserRole + 2);
+                discSizeCombo->setItemData(i + 1, QString::fromLatin1(discs[i].band), Qt::UserRole + 3);
+            }
+        }
         auto* guardCheck = new QCheckBox(tr("Layer-break guard"), dlBox);
         guardCheck->setObjectName("dlGuardCheck");
         auto* guardSpin = new QSpinBox(dlBox);
@@ -1384,6 +1441,18 @@ TsMuxerWindow::TsMuxerWindow()
         guardSpin->setValue(288);
         guardSpin->setSuffix(tr(" MB"));
         guardSpin->setEnabled(false);
+        // Guard the far side of the break as well, the same control the BDMV -> ISO tab has. Most
+        // media only fail at the start of the next layer, which is why the default puts the whole
+        // budget there, but some are weak just before it too.
+        auto* beforeCheck = new QCheckBox(tr("Also fill before the break"), dlBox);
+        beforeCheck->setObjectName("dlGuardBeforeCheck");
+        auto* beforeSpin = new QSpinBox(dlBox);
+        beforeSpin->setObjectName("dlGuardBeforeSpin");
+        beforeSpin->setRange(0, 9999);
+        beforeSpin->setValue(288);
+        beforeSpin->setSuffix(tr(" MB"));
+        beforeSpin->setEnabled(false);
+        beforeCheck->setEnabled(false);
         auto* oversizeCheck = new QCheckBox(tr("Allow oversize"), dlBox);
         oversizeCheck->setObjectName("dlAllowOversize");
         auto* fitLabel = new QLabel(tr("Fit to disc:"), dlBox);
@@ -1406,26 +1475,67 @@ TsMuxerWindow::TsMuxerWindow()
             wrapTip(tr("Mux even when the result does not fit the disc size chosen above. Useful when you burn to a "
                        "larger disc than selected or write the image to disk only. The image will not fit the selected "
                        "disc.")));
+        beforeCheck->setToolTip(wrapTip(
+            tr("The guard normally goes entirely after the break, where discs fail most often. Switch this on to "
+               "fill before it as well, for media that are also weak just before the transition. Both zones are "
+               "set independently; this one costs that much more space.")));
+        beforeSpin->setToolTip(
+            wrapTip(tr("How much to fill BEFORE the break. Only used when the box beside it is ticked.")));
+        auto* breaksLabel = new QLabel(dlBox);
+        breaksLabel->setWordWrap(true);
+        breaksLabel->setStyleSheet("color:#7f8c8d;");
         int rr = 0;
         dl->addWidget(fitLabel, rr, 0);
         dl->addWidget(discSizeCombo, rr++, 1);
         dl->addWidget(guardCheck, rr, 0);
         dl->addWidget(guardSpin, rr++, 1);
+        dl->addWidget(beforeCheck, rr, 0);
+        dl->addWidget(beforeSpin, rr++, 1);
         dl->addWidget(oversizeCheck, rr++, 0, 1, 2);
+        dl->addWidget(breaksLabel, rr++, 0, 1, 2);
+        // Show where the guard will actually land, so a wrong disc choice is visible before the mux
+        // rather than after the burn.
+        auto updateDlBreaks = [discSizeCombo, breaksLabel]()
+        {
+            const qint64 sectors = discSizeCombo->currentData(Qt::UserRole + 1).toLongLong();
+            const QList<qint64> breaks = discBreaks(sectors, discSizeCombo->currentData().toInt());
+            if (breaks.isEmpty())
+            {
+                breaksLabel->clear();
+                return;
+            }
+            QStringList pretty;
+            for (const qint64 b : breaks) pretty << QLocale().toString(b);
+            breaksLabel->setText(TsMuxerWindow::tr("Layer break(s) at sector: %1").arg(pretty.join("   |   ")));
+        };
+        updateDlBreaks();
+        connect(discSizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), dlBox,
+                [updateDlBreaks](int) { updateDlBreaks(); });
         // guardSpin follows guardCheck, but only where the guard actually does something (see
         // updateDlVisibility below).
-        connect(guardCheck, &QCheckBox::toggled, guardSpin, [this, guardSpin](const bool on)
-                { guardSpin->setEnabled(on && ui->radioButtonBluRayISO->isChecked()); });
+        connect(guardCheck, &QCheckBox::toggled, guardSpin,
+                [this, guardSpin, beforeCheck, beforeSpin](const bool on)
+                {
+                    const bool iso = ui->radioButtonBluRayISO->isChecked();
+                    guardSpin->setEnabled(on && iso);
+                    beforeCheck->setEnabled(on && iso);
+                    beforeSpin->setEnabled(on && iso && beforeCheck->isChecked());
+                });
+        connect(beforeCheck, &QCheckBox::toggled, beforeSpin,
+                [this, guardCheck, beforeSpin](const bool on)
+                { beforeSpin->setEnabled(on && guardCheck->isChecked() && ui->radioButtonBluRayISO->isChecked()); });
         // Add to the main window's Output group. Use ui->verticalLayout_2 directly rather than
         // findChild("verticalLayout_2"): the muxForm progress dialog is a child of this window and has a
         // layout of the same name, so findChild would inject the group into the progress dialog instead.
         ui->verticalLayout_2->addWidget(dlBox);
         // These options only apply to Blu-ray ISO / folder output (see the meta builder), so show the group
         // only for those output modes and keep it hidden for TS / M2TS / MKV / AVCHD / Demux.
-        auto updateDlVisibility = [this, dlBox, guardCheck, guardSpin]()
+        auto updateDlVisibility = [this, dlBox, guardCheck, guardSpin, beforeCheck, beforeSpin]()
         {
             const bool iso = ui->radioButtonBluRayISO->isChecked();
             dlBox->setVisible(iso || ui->radioButtonBluRay->isChecked());
+            beforeCheck->setEnabled(iso && guardCheck->isChecked());
+            beforeSpin->setEnabled(iso && guardCheck->isChecked() && beforeCheck->isChecked());
             // The layer-break guard writes zero padding into the disc IMAGE: BlurayHelper::open
             // only applies it when the output extension is .iso. A Blu-ray FOLDER has no image and
             // no layer break, so leaving the control usable there let you tick it and set a size
@@ -1442,14 +1552,29 @@ TsMuxerWindow::TsMuxerWindow()
 
         // Re-translate this groupbox on a runtime language change (see the BDMV->ISO tab hook above).
         m_retranslateHooks.push_back(
-            [dlBox, fitLabel, guardCheck, guardSpin, oversizeCheck, discSizeCombo]()
+            [dlBox, fitLabel, guardCheck, guardSpin, oversizeCheck, discSizeCombo, beforeCheck, beforeSpin,
+             updateDlBreaks]()
             {
                 dlBox->setTitle(tr("Dual-layer (BD-R/RE DL)"));
                 fitLabel->setText(tr("Fit to disc:"));
                 guardCheck->setText(tr("Layer-break guard"));
+                beforeCheck->setText(tr("Also fill before the break"));
                 oversizeCheck->setText(tr("Allow oversize"));
                 discSizeCombo->setItemText(0, tr("Off"));
+                {
+                    int discCount = 0;
+                    const DiscEntry* discs = discTable(discCount);
+                    for (int i = 0; i < discCount; ++i) discSizeCombo->setItemText(i + 1, tr(discs[i].label));
+                }
                 guardSpin->setSuffix(tr(" MB"));
+                beforeSpin->setSuffix(tr(" MB"));
+                beforeCheck->setToolTip(wrapTip(
+                    tr("The guard normally goes entirely after the break, where discs fail most often. Switch this "
+                       "on to fill before it as well, for media that are also weak just before the transition. Both "
+                       "zones are set independently; this one costs that much more space.")));
+                beforeSpin->setToolTip(
+                    wrapTip(tr("How much to fill BEFORE the break. Only used when the box beside it is ticked.")));
+                updateDlBreaks();  // the "Layer break(s) at sector:" line carries a translated prefix
                 // The tooltips need re-setting too, exactly as the BDMV -> ISO tab hook does.
                 // Without this they keep the language the window was built in.
                 const QString fitTip =
@@ -2812,14 +2937,32 @@ QString TsMuxerWindow::getMuxOpts()
     if (ui->radioButtonBluRay->isChecked() || ui->radioButtonBluRayISO->isChecked())
     {
         auto* discSizeCombo = findChild<QComboBox*>("dlDiscSize");
-        if (discSizeCombo && discSizeCombo->currentIndex() > 0)
-            rez += " --disc-size=" + discSizeCombo->currentText().toLower();
+        // The capacity goes out as an exact byte count taken from the disc's Free Sectors, not as a
+        // bd50/bd100 keyword, so the 66 GB two-layer entry can be expressed at all.
+        const qint64 discSectors =
+            discSizeCombo ? discSizeCombo->currentData(Qt::UserRole + 1).toLongLong() : qint64(0);
+        if (discSectors > 0)
+            rez += " --disc-size=" + QString::number(discSectors * 2048LL);
         auto* guardCheck = findChild<QCheckBox*>("dlGuardCheck");
         auto* guardSpin = findChild<QSpinBox*>("dlGuardSpin");
         // ISO only: the guard pads the disc image. Emitting it for a Blu-ray folder would put an
         // option in the meta that the muxer ignores.
         if (guardCheck && guardSpin && guardCheck->isChecked() && ui->radioButtonBluRayISO->isChecked())
+        {
             rez += " --layer-break-guard=" + QString::number(guardSpin->value());
+            // The break sectors have to be sent explicitly. Without them the engine falls back to
+            // one break at half a BD-R DL disc, which is only right for a 50 GB disc: on 100 or
+            // 128 GB it is not a layer boundary at all, so the guard used to protect nothing there.
+            QStringList breaks;
+            for (const qint64 b : discBreaks(discSectors, discSizeCombo->currentData().toInt()))
+                breaks << QString::number(b);
+            if (!breaks.isEmpty())
+                rez += " --layer-break-lbn=" + breaks.join(",");
+            auto* beforeCheck = findChild<QCheckBox*>("dlGuardBeforeCheck");
+            auto* beforeSpin = findChild<QSpinBox*>("dlGuardBeforeSpin");
+            if (beforeCheck && beforeSpin && beforeCheck->isChecked())
+                rez += " --layer-break-guard-before=" + QString::number(beforeSpin->value());
+        }
         auto* oversizeCheck = findChild<QCheckBox*>("dlAllowOversize");
         if (oversizeCheck && oversizeCheck->isChecked())
             rez += " --allow-oversize";
