@@ -19,6 +19,7 @@ add_executable (tsmuxer
   bufferedReaderManager.cpp
   combinedH264Demuxer.cpp
   convertUTF.cpp
+  doviLib.cpp
   dtsStreamReader.cpp
   dvbSubStreamReader.cpp
   flacStreamReader.cpp
@@ -138,6 +139,8 @@ else()
   target_include_directories(tsmuxer PRIVATE ${FREETYPE_INCLUDE_DIRS})
 endif()
 
-target_link_libraries(tsmuxer mediation ${THREADSLIB} ${ZLIB_LIBRARIES})
+# libdovi is loaded by name at run time, never linked, so only the loader itself is needed here
+# (dlopen lives in libdl on some systems; CMAKE_DL_LIBS is empty where it does not).
+target_link_libraries(tsmuxer mediation ${THREADSLIB} ${ZLIB_LIBRARIES} ${CMAKE_DL_LIBS})
 
 install (TARGETS tsmuxer DESTINATION ${CMAKE_INSTALL_BINDIR})
