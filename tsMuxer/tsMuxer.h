@@ -20,7 +20,11 @@ enum V3Flags
     HDR10PLUS = 16,
     FOUR_K = 32,
     BL_TRACK = 64,
-    BL_NOTCOMPAT = 128
+    BL_NOTCOMPAT = 128,
+    // Set when the output is a Blu-ray structure, so a stream reader can tell disc authoring from a
+    // plain .ts or a demux. Readers have no other way to know: H264StreamReader's m_blurayMode is
+    // hardcoded true in its constructor and never reflects the output type.
+    BLURAY_OUT = 256
 };
 
 extern int V3_flags;

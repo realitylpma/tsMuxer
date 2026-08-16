@@ -91,6 +91,13 @@ class HEVCStreamReader final : public MPEGStreamReader
     int m_vpsSizeDiff;
     uint8_t m_forcedLevel;
     bool m_levelChangeReported;
+    // The stream's OWN mastering display and content light level SEI, kept so they can be repeated
+    // at every IRAP. Nothing is fabricated; these are the source's bytes.
+    MemoryBlock m_masteringSeiBuffer;
+    MemoryBlock m_cllSeiBuffer;
+    bool m_auHasMasteringSei;
+    bool m_auHasCllSei;
+    bool m_hdrSeiRepeatReported;
     // Lowest slice_type seen in the current access unit, for the pic_type of a generated access
     // unit delimiter. HEVC orders them B=0, P=1, I=2, so the lowest is the most permissive.
     int m_auMinSliceType;
@@ -99,6 +106,8 @@ class HEVCStreamReader final : public MPEGStreamReader
     // Rewrite general_level_idc in a VPS or SPS that is already sitting in the stream buffer.
     // buff points at the NAL header, nextNal at the start code of the following NAL.
     void applyForcedLevel(HevcUnitWithProfile* unit, uint8_t* buff, const uint8_t* nextNal);
+    // Put the HDR SEI back at an IRAP that lacks them. Returns bytes inserted before slicePos.
+    int repeatHdrSeiAtIrap(uint8_t* slicePos);
 };
 
 #endif  // _HEVC_STREAM_READER_H_

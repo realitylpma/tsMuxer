@@ -36,6 +36,9 @@ HEVCStreamReader::HEVCStreamReader()
       m_vpsSizeDiff(0),
       m_forcedLevel(0),
       m_levelChangeReported(false),
+      m_auHasMasteringSei(false),
+      m_auHasCllSei(false),
+      m_hdrSeiRepeatReported(false),
       m_auMinSliceType(-1),
       m_audInsertReported(false)
 {
@@ -76,6 +79,66 @@ void HEVCStreamReader::applyForcedLevel(HevcUnitWithProfile* unit, uint8_t* buff
         return;
     }
     memcpy(buff, tmpBuffer.get(), newNalSize);
+}
+
+// A source that writes mastering_display_colour_volume and content_light_level_info ONCE, at the
+// head of the stream, leaves a player with no HDR10 metadata at all after a seek. Every pressed disc
+// repeats both at EVERY IRAP. This puts them back.
+//
+// Nothing is fabricated: the bytes are the stream's own, captured when they first went past. A
+// source that already repeats them is left alone, because then the per access unit flags are set.
+// Only Dolby Vision is unaffected by the omission, since its RPU carries per frame metadata, which
+// is exactly why the gap is easy to miss.
+//
+// WHERE IT GOES MATTERS. The insertion point is immediately BEFORE the first slice, not after the
+// PPS. By that point every prefix NAL of this access unit has been seen, so whether the source
+// already supplied them is KNOWN rather than guessed. It is still inside the prefix SEI region, so
+// the order the standard requires still holds: AUD, then VPS SPS PPS, then prefix SEI, then slices.
+//
+// The buffer move is the one updateStreamFps already uses, with the same bound on TMP_BUFFER_SIZE.
+int HEVCStreamReader::repeatHdrSeiAtIrap(uint8_t* slicePos)
+{
+    if (!(V3_flags & BLURAY_OUT))
+        return 0;
+    const bool needMaster = !m_auHasMasteringSei && m_masteringSeiBuffer.size() > 0;
+    const bool needCll = !m_auHasCllSei && m_cllSeiBuffer.size() > 0;
+    if (!needMaster && !needCll)
+        return 0;
+
+    const int need = static_cast<int>((needMaster ? 4 + m_masteringSeiBuffer.size() : 0) +
+                                      (needCll ? 4 + m_cllSeiBuffer.size() : 0));
+
+    // the start code in front of this slice, three or four bytes long
+    uint8_t* at = slicePos - 3;
+    if (at > m_tmpBuffer && at[-1] == 0)
+        at--;
+    if (at < m_tmpBuffer || m_bufEnd + need > m_tmpBuffer + TMP_BUFFER_SIZE)
+        return 0;  // nowhere to put it, or no room: leave the stream exactly as it is
+
+    memmove(at + need, at, m_bufEnd - at);
+    m_bufEnd += need;
+
+    uint8_t* w = at;
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const MemoryBlock* blk =
+            pass == 0 ? (needMaster ? &m_masteringSeiBuffer : nullptr) : (needCll ? &m_cllSeiBuffer : nullptr);
+        if (!blk)
+            continue;
+        *w++ = 0;
+        *w++ = 0;
+        *w++ = 0;
+        *w++ = 1;
+        memcpy(w, blk->data(), blk->size());
+        w += blk->size();
+    }
+
+    if (!m_hdrSeiRepeatReported)
+    {
+        m_hdrSeiRepeatReported = true;
+        LTRACE(LT_INFO, 2, "HEVC HDR metadata appears only once: repeating it at every IRAP");
+    }
+    return need;
 }
 
 HEVCStreamReader::~HEVCStreamReader()
@@ -788,6 +851,8 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
     bool sliceFound = false;
     m_spsPpsFound = false;
     m_lastIFrame = false;
+    m_auHasMasteringSei = false;
+    m_auHasCllSei = false;
 
     const uint8_t* prevPos = nullptr;
     uint8_t* curPos = buff;
@@ -809,7 +874,16 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                     incTimings();
                     return 0;
                 }
-                // first slice of current frame
+                // first slice of current frame. Before parsing it, put back any HDR SEI this
+                // access unit should carry: every prefix NAL of it has now been seen, so what the
+                // source already supplied is known rather than guessed. The slice moves forward by
+                // whatever was inserted in front of it.
+                if (nalType >= HevcUnit::NalType::BLA_W_LP)
+                {
+                    const int hdrAdded = repeatHdrSeiAtIrap(curPos);
+                    curPos += hdrAdded;
+                    nextNal += hdrAdded;
+                }
                 m_slice->decodeBuffer(curPos, FFMIN(curPos + MAX_SLICE_HEADER, nextNal));
                 rez = m_slice->deserialize(m_sps, m_pps);
                 if (rez)
@@ -879,6 +953,27 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                 storeBuffer(m_ppsBuffer, curPos, nextNalWithStartCode);
                 break;
             case HevcUnit::NalType::SEI_PREFIX:
+            {
+                // payload_type, read straight off the bytes after the 2 byte NAL header
+                const uint8_t* pt = curPos + 2;
+                int payloadType = 0;
+                while (pt < nextNalWithStartCode && *pt == 0xFF)
+                {
+                    payloadType += 255;
+                    ++pt;
+                }
+                if (pt < nextNalWithStartCode)
+                    payloadType += *pt;
+                if (payloadType == 137)  // mastering_display_colour_volume
+                {
+                    m_auHasMasteringSei = true;
+                    storeBuffer(m_masteringSeiBuffer, curPos, nextNalWithStartCode);
+                }
+                else if (payloadType == 144)  // content_light_level_info
+                {
+                    m_auHasCllSei = true;
+                    storeBuffer(m_cllSeiBuffer, curPos, nextNalWithStartCode);
+                }
                 try
                 {
                     m_hdr->decodeBuffer(curPos, nextNal);
@@ -893,6 +988,7 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                         LTRACE(LT_WARN, 2, "HEVC: malformed SEI prefix NAL ignored (frame " << m_totalFrameNum << ")");
                 }
                 break;
+            }
             default:
                 break;
             }

@@ -507,6 +507,7 @@ void MuxerManager::parseMuxOpt(const string& opts)
         else if (paramPair[0] == "--blu-ray" || paramPair[0] == "--blu-ray-v3" || paramPair[0] == "--avchd")
         {
             m_bluRayMode = true;
+            V3_flags |= BLURAY_OUT;
         }
         else if (paramPair[0] == "--demux")
         {
