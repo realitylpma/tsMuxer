@@ -91,6 +91,10 @@ class HEVCStreamReader final : public MPEGStreamReader
     int m_vpsSizeDiff;
     uint8_t m_forcedLevel;
     bool m_levelChangeReported;
+    // Lowest slice_type seen in the current access unit, for the pic_type of a generated access
+    // unit delimiter. HEVC orders them B=0, P=1, I=2, so the lowest is the most permissive.
+    int m_auMinSliceType;
+    bool m_audInsertReported;
 
     // Rewrite general_level_idc in a VPS or SPS that is already sitting in the stream buffer.
     // buff points at the NAL header, nextNal at the start code of the following NAL.

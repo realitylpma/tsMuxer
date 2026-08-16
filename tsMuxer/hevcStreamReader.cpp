@@ -35,7 +35,9 @@ HEVCStreamReader::HEVCStreamReader()
       m_vpsCounter(0),
       m_vpsSizeDiff(0),
       m_forcedLevel(0),
-      m_levelChangeReported(false)
+      m_levelChangeReported(false),
+      m_auMinSliceType(-1),
+      m_audInsertReported(false)
 {
 }
 
@@ -814,6 +816,11 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                     return rez;  // not enough buffer or error
                 if (nalType >= HevcUnit::NalType::BLA_W_LP)
                     m_lastIFrame = true;
+                // B is 0, P is 1, I is 2, so the lowest value seen is the most permissive and
+                // is exactly what pic_type has to declare in a generated delimiter.
+                if (m_slice->slice_type <= 2 &&
+                    (m_auMinSliceType < 0 || static_cast<int>(m_slice->slice_type) < m_auMinSliceType))
+                    m_auMinSliceType = static_cast<int>(m_slice->slice_type);
                 m_fullPicOrder = toFullPicOrder(m_slice, m_sps->log2_max_pic_order_cnt_lsb);
             }
             sliceFound = true;
@@ -934,6 +941,7 @@ int HEVCStreamReader::writeAdditionData(uint8_t* dstBuffer, uint8_t* dstEnd, AVP
                                         PriorityDataInfo* priorityData)
 {
     uint8_t* curPos = dstBuffer;
+    bool audFound = false;
 
     if (avPacket.size > 4 && avPacket.size < dstEnd - dstBuffer)
     {
@@ -946,8 +954,40 @@ int HEVCStreamReader::writeAdditionData(uint8_t* dstBuffer, uint8_t* dstEnd, AVP
             curPos += avPacket.size;
             avPacket.size = 0;
             avPacket.data = nullptr;
+            audFound = true;
         }
     }
+
+    // A source without access unit delimiters is legal HEVC, where the delimiter is optional, but
+    // every pressed Blu-ray carries exactly one per picture in every video layer, and the H.264
+    // reader has always inserted them when a source lacked them (h264StreamReader.cpp, the
+    // m_delimiterFound path). HEVC never did, so an elementary stream from a source that omits them
+    // was authored to disc without any. This closes that gap.
+    //
+    // pic_type must not over-claim: it declares the SET of slice types the picture may contain, so
+    // announcing B for an all-I picture would be wrong. m_auMinSliceType carries the lowest
+    // slice_type seen for this access unit, and the mapping is exactly 2 minus that value, giving
+    // the same 0x10, 0x30 and 0x50 payload bytes a pressed disc uses. If no slice was seen, 2 is
+    // the safe answer because its set contains every type.
+    if (!audFound)
+    {
+        if (dstEnd - curPos < 7)
+            THROW(ERR_COMMON, "HEVC stream error: not enough buffer to write an access unit delimiter")
+        if (!m_audInsertReported)
+        {
+            m_audInsertReported = true;
+            LTRACE(LT_INFO, 2, "HEVC bitstream has no access unit delimiters: inserting them");
+        }
+        const int picType = m_auMinSliceType < 0 ? 2 : 2 - m_auMinSliceType;
+        *curPos++ = 0;
+        *curPos++ = 0;
+        *curPos++ = 0;
+        *curPos++ = 1;
+        *curPos++ = static_cast<uint8_t>(HevcUnit::NalType::AUD) << 1;  // 0x46, layer 0
+        *curPos++ = 1;                                                  // temporal id plus 1
+        *curPos++ = static_cast<uint8_t>(picType << 5 | 0x10);          // pic_type + rbsp trailing
+    }
+    m_auMinSliceType = -1;
 
     const bool needInsSpsPps = m_firstFileFrame && !(avPacket.flags & AVPacket::IS_SPS_PPS_IN_GOP);
     if (needInsSpsPps)
