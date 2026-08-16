@@ -1627,10 +1627,19 @@ TsMuxerWindow::TsMuxerWindow()
         ui->verticalLayout_2->addWidget(dlBox);
         // These options only apply to Blu-ray ISO / folder output (see the meta builder), so show the group
         // only for those output modes and keep it hidden for TS / M2TS / MKV / AVCHD / Demux.
-        auto updateDlVisibility = [this, dlBox, guardCheck, guardSpin, beforeCheck, beforeSpin]()
+        auto updateDlVisibility = [this, dlBox, guardCheck, guardSpin, beforeCheck, beforeSpin, breaksLabel]()
         {
             const bool iso = ui->radioButtonBluRayISO->isChecked();
             dlBox->setVisible(iso || ui->radioButtonBluRay->isChecked());
+            // A Blu-ray FOLDER has no image and therefore no layer break, so the guard controls are
+            // HIDDEN there rather than merely greyed out. Greyed out still invites the question of
+            // what they would do, and the answer is nothing. Fit to disc and Allow oversize stay,
+            // because the capacity check applies to a folder just as much as to an image.
+            guardCheck->setVisible(iso);
+            guardSpin->setVisible(iso);
+            beforeCheck->setVisible(iso);
+            beforeSpin->setVisible(iso);
+            breaksLabel->setVisible(iso);
             beforeCheck->setEnabled(iso && guardCheck->isChecked());
             beforeSpin->setEnabled(iso && guardCheck->isChecked() && beforeCheck->isChecked());
             // The layer-break guard writes zero padding into the disc IMAGE: BlurayHelper::open
