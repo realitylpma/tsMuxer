@@ -121,7 +121,50 @@ int HevcUnit::serializeBuffer(uint8_t* dstBuffer, const uint8_t* dstEnd) const
 
 // ------------------------- HevcUnitWithProfile  -------------------
 
-HevcUnitWithProfile::HevcUnitWithProfile() : profile_idc(0), level_idc(0), interlaced_source_flag(false) {}
+HevcUnitWithProfile::HevcUnitWithProfile()
+    : profile_idc(0), level_idc(0), interlaced_source_flag(false), level_idc_bit_pos(-1)
+{
+}
+
+bool HevcUnitWithProfile::setLevel(const uint8_t newLevel)
+{
+    if (level_idc_bit_pos <= 0)
+    {
+        LTRACE(LT_WARN, 2,
+               "HEVC unit does not expose general_level_idc (bit_pos=" << level_idc_bit_pos
+                                                                       << "), cannot change the level");
+        return false;
+    }
+    // general_level_idc is ALWAYS byte aligned, so write the byte directly instead of going through
+    // updateBits. Everything before it inside profile_tier_level is a whole 11 bytes (1 profile, 4
+    // compatibility flags, 6 of source and reserved flags), and the structure itself starts on a
+    // byte boundary in both carriers: 2 bytes of NAL header plus 1 in an SPS, plus 4 in a VPS.
+    //
+    // This is not a micro-optimisation. updateBits needs bitOffset/8 + bitLen/8 + 5 bytes of room
+    // because BitStreamWriter flushes a whole word, a margin added deliberately to stop the
+    // heap overflows in GitHub #897 and #898. A real VPS is 22 bytes unescaped and the level sits at
+    // byte 17, so that check refuses the write and the VPS silently keeps its old level while the
+    // SPS gets the new one. Weakening the guard to reach one aligned byte would be the wrong trade.
+    if (level_idc_bit_pos % 8 != 0)
+    {
+        if (!updateBits(level_idc_bit_pos, 8, newLevel))
+            return false;
+        level_idc = newLevel;
+        return true;
+    }
+
+    const int levelByte = level_idc_bit_pos / 8;
+    if (levelByte >= m_nalBufferLen)
+    {
+        LTRACE(LT_WARN, 2,
+               "HEVC level byte at " << levelByte << " is outside the " << m_nalBufferLen
+                                     << " byte NAL, cannot change the level");
+        return false;
+    }
+    m_nalBuffer[levelByte] = newLevel;
+    level_idc = newLevel;
+    return true;
+}
 
 int HevcUnitWithProfile::profile_tier_level(const int subLayers)
 {
@@ -137,6 +180,7 @@ int HevcUnitWithProfile::profile_tier_level(const int subLayers)
         interlaced_source_flag = m_reader.getBit();
         m_reader.skipBits(32);  // unused flags
         m_reader.skipBits(14);  // unused flags
+        level_idc_bit_pos = m_reader.getBitsCount();
         level_idc = m_reader.getBits<uint8_t>(8);
 
         for (int i = 0; i < subLayers - 1; i++)

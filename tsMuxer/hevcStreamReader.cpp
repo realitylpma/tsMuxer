@@ -33,8 +33,47 @@ HEVCStreamReader::HEVCStreamReader()
       m_lastIFrame(false),
       m_firstFileFrame(false),
       m_vpsCounter(0),
-      m_vpsSizeDiff(0)
+      m_vpsSizeDiff(0),
+      m_forcedLevel(0),
+      m_levelChangeReported(false)
 {
+}
+
+void HEVCStreamReader::applyForcedLevel(HevcUnitWithProfile* unit, uint8_t* buff, const uint8_t* nextNal)
+{
+    if (m_forcedLevel == 0 || unit->level_idc == m_forcedLevel)
+        return;
+
+    if (!m_levelChangeReported)
+    {
+        LTRACE(LT_INFO, 2,
+               "Change HEVC level from " << unit->level_idc / 30 << '.' << unit->level_idc % 30 / 3 << " to "
+                                         << m_forcedLevel / 30 << '.' << m_forcedLevel % 30 / 3);
+        m_levelChangeReported = true;
+    }
+
+    const int oldNalSize = static_cast<int>(nextNal - buff);
+    const uint8_t previousLevel = unit->level_idc;
+    if (!unit->setLevel(m_forcedLevel))
+        return;
+
+    const auto tmpBuffer = std::make_unique<uint8_t[]>(unit->nalBufferLen() + 16);
+    const int newNalSize = unit->serializeBuffer(tmpBuffer.get(), tmpBuffer.get() + unit->nalBufferLen() + 16);
+
+    // The rewrite is deliberately restricted to the same-length case, and every real level fits it:
+    // emulation prevention is inserted before a byte <= 3 that follows two zero bytes, and level_idc
+    // is at least 30 (level 1.0), so swapping one legal level for another can neither create nor
+    // remove an escape. A different length therefore means something unexpected, and shifting the
+    // rest of the buffer for a cosmetic field is not worth the risk, so the stream is left alone.
+    if (newNalSize != oldNalSize)
+    {
+        LTRACE(LT_WARN, 2,
+               "HEVC level change would resize the NAL from " << oldNalSize << " to " << newNalSize
+                                                              << " bytes, leaving the level unchanged");
+        unit->setLevel(previousLevel);
+        return;
+    }
+    memcpy(buff, tmpBuffer.get(), newNalSize);
 }
 
 HEVCStreamReader::~HEVCStreamReader()
@@ -804,6 +843,8 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                 m_vpsSizeDiff = 0;
                 if (m_vps->num_units_in_tick)
                     updateFPS(m_vps, curPos, nextNalWithStartCode, 0);
+                // After the fps rewrite, because that one can move the end of the NAL.
+                applyForcedLevel(m_vps, curPos, nextNalWithStartCode + m_vpsSizeDiff);
                 nextNal += m_vpsSizeDiff;
                 storeBuffer(m_vpsBuffer, curPos, nextNalWithStartCode);
                 break;
@@ -816,6 +857,8 @@ int HEVCStreamReader::intDecodeNAL(uint8_t* buff)
                     return rez;
                 m_spsPpsFound = true;
                 updateFPS(m_sps, curPos, nextNalWithStartCode, 0);
+                // The level lives in the SPS as well as the VPS, and a player may read either.
+                applyForcedLevel(m_sps, curPos, nextNalWithStartCode);
                 storeBuffer(m_spsBuffer, curPos, nextNalWithStartCode);
                 break;
             case HevcUnit::NalType::PPS:

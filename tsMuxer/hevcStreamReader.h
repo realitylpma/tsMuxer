@@ -28,6 +28,10 @@ class HEVCStreamReader final : public MPEGStreamReader
     static int doViLevelFor(unsigned width, uint32_t pixelRate);
     [[nodiscard]] uint32_t doViPixelRate() const;
     CheckStreamRez checkStream(uint8_t* buffer, int len);
+    // Force general_level_idc in every VPS and SPS written out, in units of 30 (level 5.1 = 153).
+    // Zero leaves the stream alone. The H.264 reader has had this for years (setForceLevel there);
+    // without it on HEVC the only way to change a level is to re-encode the whole track.
+    void setForceLevel(const uint8_t value) { m_forcedLevel = value; }
     void applyDiscoveryData(const StreamDiscoveryData& data) override;
     void fillVideoDiscoveryData(StreamDiscoveryData& data) override;
     [[nodiscard]] bool needSPSForSplit() const override { return false; }
@@ -85,6 +89,12 @@ class HEVCStreamReader final : public MPEGStreamReader
     bool m_firstFileFrame;
     int m_vpsCounter;
     int m_vpsSizeDiff;
+    uint8_t m_forcedLevel;
+    bool m_levelChangeReported;
+
+    // Rewrite general_level_idc in a VPS or SPS that is already sitting in the stream buffer.
+    // buff points at the NAL header, nextNal at the start code of the following NAL.
+    void applyForcedLevel(HevcUnitWithProfile* unit, uint8_t* buff, const uint8_t* nextNal);
 };
 
 #endif  // _HEVC_STREAM_READER_H_

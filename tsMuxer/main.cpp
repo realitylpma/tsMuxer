@@ -494,7 +494,15 @@ Additional parameters for H.264 video tracks:
 - pipScale          PIP window scale factor. Allowed values: "1", "1/2", "1/4",
                     "1.5", "fullScreen".
 - pipLumma          Allow the PIP window to be transparent. Transparent colors
-                    are lumma colors in range [0..pipLumma]. 
+                    are lumma colors in range [0..pipLumma].
+
+Additional parameters for HEVC video tracks:
+- level             Overwrite the level in the HEVC stream, for example
+                    level=5.1. Like the H.264 option of the same name this only
+                    rewrites the headers and does not reencode, so a level lower
+                    than the stream actually needs will not be met. Raising it
+                    is safe, since a higher level is a superset of a lower one.
+                    Written to every VPS and SPS.
 
 Additional parameters for PG and SRT tracks:
 

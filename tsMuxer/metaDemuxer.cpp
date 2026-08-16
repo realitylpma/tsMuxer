@@ -6,6 +6,7 @@
 #include <fs/textfile.h>
 #include <types/types.h>
 #include <climits>
+#include <cmath>
 #include <memory>
 #include <set>
 
@@ -1405,6 +1406,15 @@ AbstractStreamReader* METADemuxer::createCodec(const string& codecName, const ma
             double fps = strToDouble(itr->second.c_str());
             fps = correctFps(fps);
             dynamic_cast<HEVCStreamReader*>(rez)->setFPS(fps);
+        }
+        itr = addParams.find("level");
+        if (itr != addParams.end())
+        {
+            // HEVC counts levels in thirtieths, unlike H.264's tenths: level 5.1 is 153, not 51.
+            const double level = strToDouble(itr->second.c_str());
+            if (level < 1.0 || level > 8.5)
+                THROW(ERR_COMMON, "Invalid HEVC level " << itr->second << ", expected a value like 5.1")
+            dynamic_cast<HEVCStreamReader*>(rez)->setForceLevel(static_cast<uint8_t>(lround(level * 30.0)));
         }
     }
     else if (codecName == "V_MPEGI/ISO/VVC")

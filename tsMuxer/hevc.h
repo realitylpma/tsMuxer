@@ -69,9 +69,19 @@ struct HevcUnitWithProfile : HevcUnit
     HevcUnitWithProfile();
     [[nodiscard]] std::string getProfileString() const;
 
+    // Rewrite general_level_idc in place. No pixel is touched: the level only declares how much
+    // capability a decoder needs, and a higher level is a superset of a lower one, so a stream
+    // conformant to the old level stays conformant. Returns false if the field was not located
+    // while parsing, or the buffer is too small to write into.
+    bool setLevel(uint8_t newLevel);
+
     uint8_t profile_idc;
     uint8_t level_idc;
     bool interlaced_source_flag;
+    // Bit position of general_level_idc inside the UNESCAPED NAL, recorded while parsing. It has to
+    // be recorded rather than computed: the reserved bits just before it are zeros, so emulation
+    // prevention bytes land in that exact region and a fixed offset into the raw NAL is wrong.
+    int level_idc_bit_pos;
 
    protected:
     int profile_tier_level(int subLayers);
