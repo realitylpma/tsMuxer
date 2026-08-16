@@ -18,7 +18,7 @@ can merge them at mux time via the meta/GUI option `merge-ac3-track` (see `docs/
 Some of the major features include:
 
 * Ability to set muxing fps manually and automatically
-* Ability to change level for H.264 streams
+* Ability to change level for H.264 and H.265/HEVC streams, without re-encoding
 * Ability to shift a sound tracks
 * Ability to extract DTS core from DTS-HD
 * Ability to extract AC-3 core from E-AC3 (DD+) and TrueHD
@@ -35,6 +35,15 @@ Additions in this fork (see [DISC_AUTHORING.md](docs/DISC_AUTHORING.md) for deta
 * `--disc-size` / `--allow-oversize`: abort (or warn) before muxing if the image will not fit the target disc
 * GUI: a "BDMV folder -> ISO" tab with a layer-break calculator (you copy the blank disc's "Free Sectors" value out of ImgBurn and paste it in; the break sectors are calculated for you), colour-coded guard hints, and input sanity warnings
 * GUI: fully translated interface (German, Spanish, French, Hebrew, Japanese, Russian, Chinese)
+
+Dolby Vision and Blu-ray conformance:
+
+* Carry a dual layer Dolby Vision disc in a single Matroska track, and split it back into two layers to author a disc again. A disc taken to MKV and back comes out byte for byte identical, so nothing is given up by storing a film this way
+* Keep the AC-3 core of a TrueHD track in Matroska as its own track, instead of dropping it
+* Name the IMAX variant of a DTS:X track
+* HEVC: change the stream level without re-encoding, the way the H.264 path always could. A whole 4K track no longer has to be re-encoded to alter one byte
+* HEVC: write access unit delimiters when a source has none. Every pressed disc carries one per picture, and the H.264 path has always added them
+* HEVC: repeat the HDR mastering display and content light level at every random access point when authoring a disc. A source that states them only once leaves a player with no HDR10 metadata after a seek
 
 **How does the layer-break guard work?** [The layer-break buffer](docs/LAYER_BREAK_BUFFER.md)
 explains, with diagrams, how the guard protects the movie and why a block of zeros in the
