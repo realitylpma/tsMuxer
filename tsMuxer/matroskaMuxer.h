@@ -252,7 +252,7 @@ class MatroskaMuxer final : public AbstractMuxer
     // NAL type 63, which a decoder skips: that is what keeps the original disc recoverable, and it
     // is why the file does NOT get smaller the way the usual one way conversion does.
     //
-    // m_dvOriginalRpuBin collects the ORIGINAL profile 7 RPUs in the layout dovi_tool's extract-rpu
+    // m_dvOriginalRpuBin collects the ORIGINAL profile 7 RPUs in the layout an extracted RPU file
     // writes (a 4-byte start code then the RPU payload without its 2-byte NAL header), so the
     // preserved original is readable by the existing tooling and not only by tsMuxeR.
     bool m_dvWriteProfile81 = false;

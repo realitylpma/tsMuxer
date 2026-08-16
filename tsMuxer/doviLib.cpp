@@ -8,8 +8,8 @@
 
 namespace
 {
-// dovi_tool's conversion mode 2 is "profile 7 to profile 8.1". The other modes convert between
-// other profiles and are not what this feature is for.
+// libdovi's conversion mode 2 is "profile 7 to profile 8.1". The other modes convert between other
+// profiles and are not what this feature is for.
 constexpr uint8_t MODE_P7_TO_P81 = 2;
 
 #if defined(_WIN32) || defined(_WIN64)

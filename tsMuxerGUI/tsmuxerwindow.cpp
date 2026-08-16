@@ -749,7 +749,7 @@ TsMuxerWindow::TsMuxerWindow()
         freeSectorsEdit->setValidator(
             new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[0-9 .,]*")), freeSectorsEdit));
         // The value is pre-filled from the disc type and LOCKED, so the correct number cannot be changed by
-        // accident. The checkbox below unlocks it for a non-standard disc (a reformatted BD-RE, or a
+        // accident. The checkbox below makes it editable for a non-standard disc (a reformatted BD-RE, or a
         // no-defect-management BDXL burn); un-ticking re-locks and restores the safe default.
         freeSectorsEdit->setReadOnly(true);
         auto* manualCheck = new QCheckBox(tr("Enter Free Sectors manually (advanced)"), bdmvTab);
@@ -1488,7 +1488,7 @@ TsMuxerWindow::TsMuxerWindow()
         // exists at two capacities, and the layer break is computed from whatever is here, so a
         // figure that does not match the disc in the drive puts the guard in the wrong place. The
         // value is pre-filled from the disc above and locked, exactly as in the BDMV -> ISO tab, so
-        // it cannot be changed by accident; the checkbox unlocks it for a disc that reports
+        // it cannot be changed by accident; the checkbox makes it editable for a disc that reports
         // something else.
         auto* dlFreeSectorsLabel = new QLabel(tr("Free Sectors (ImgBurn):"), dlBox);
         auto* dlFreeSectorsEdit = new QLineEdit(dlBox);

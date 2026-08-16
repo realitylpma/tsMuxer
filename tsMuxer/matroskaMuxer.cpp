@@ -1595,7 +1595,7 @@ std::vector<uint8_t> MatroskaMuxer::convertDvElToLengthPrefixed(const uint8_t* d
                     THROW(ERR_COMMON, "Dolby Vision: converting an RPU to profile 8.1 failed after "
                                           << m_dvRpusConverted << " frames: " << err)
                 }
-                // The original, in the layout dovi_tool's extract-rpu writes: a 4-byte start code
+                // The original, in the layout an extracted RPU file uses: a 4-byte start code
                 // then the payload WITHOUT its two byte NAL header. Verified against a real RPU.bin.
                 m_dvOriginalRpuBin.push_back(0x00);
                 m_dvOriginalRpuBin.push_back(0x00);
