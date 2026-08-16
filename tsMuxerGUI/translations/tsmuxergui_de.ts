@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>Bei Auswahl eines Rohlings wird die VOLLE Free-Sectors-Zahl dieser Größe eingetragen. Prüfen Sie sie IMMER gegen das, was ImgBurn für Ihren eigenen Rohling anzeigt. Eine mit Fehlerverwaltung formatierte Disc meldet weniger, und wie viel weniger hängt davon ab, wie sie formatiert wurde: ein einzelner 25-GB-Rohling bot hier drei verschiedene Größen für den Ersatzbereich an, deshalb lässt sich hier kein einzelner reduzierter Wert aufführen. Weicht Ihrer ab, haken Sie "Free Sectors manuell eingeben" an und tragen Sie den Wert von ImgBurn ein: Der Layer-Break wird aus dieser Zahl berechnet, ein falscher Wert setzt den Schutz also an die falsche Stelle.</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB, 1 Schicht (12,219,392 Sektoren)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>Die Kapazität der Disc, die Sie brennen, so wie ImgBurn sie unter Free Sectors anzeigt. Der Layer-Break wird aus dieser Zahl berechnet. Zeigt Ihre Disc einen anderen Wert an, haken Sie das Kästchen darunter an und tragen Sie diesen Wert ein.</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>Auch vor dem Break auffüllen</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 Ein Image von etwa 66 GB (die ersten beiden Layer, als eigener Disc-Eintrag auswählbar) verbessert die Chancen bei manchen Playern, aber auch 66 GB spielt nicht garantiert ab. Testen Sie auf Ihrem eigenen Gerät.
 
 ISO trotzdem erstellen?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>Bei Auswahl eines Rohlings werden dessen Free Sectors unten vorab ausgefüllt. Prüfen Sie diesen Wert IMMER gegen den, den ImgBurn für Ihren eigenen Rohling anzeigt, denn dieselbe Disc-Größe gibt es mit zwei Kapazitäten: Eine Disc mit Fehlerverwaltung hält 1 GiB pro Layer als Ersatzbereich zurück und meldet stattdessen 47,305,728 (100 GB), 60,403,712 (128 GB) oder 23,652,352 (BD-RE DL). Weicht Ihrer ab, haken Sie "Free Sectors manuell eingeben" an und tragen Sie den Wert von ImgBurn ein: Der Layer-Break wird aus dieser Zahl berechnet, ein falscher Wert setzt den Schutz also an die falsche Stelle.</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

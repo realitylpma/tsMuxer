@@ -424,6 +424,27 @@ static const DiscEntry* discTable(int& count)
     return entries;
 }
 
+// Single layer discs, for the "Fit to disc" list beside the normal Blu-ray output ONLY. That list
+// is older than the disc table above and always offered BD25, so dropping it would take away a
+// size people use. They are not offered in the layer-break calculator because a single layer disc
+// has no layer break to calculate: capacity is all they contribute, which is exactly what fitting
+// to a disc needs.
+//
+// Only the FULL capacity is listed, and deliberately so. A disc formatted with defect management
+// reports less, but "less" is not one number: asked what it could be formatted to, a single blank
+// 25 GB disc here offered 11,826,176, 12,088,320 and 5,796,864 blocks, three different spare area
+// sizes. Listing one of them would present an arbitrary choice as the answer, which is the mistake
+// this whole area already made once. A defect-managed disc is served by the manual field, and in
+// future by reading the capacity off the drive.
+static const DiscEntry* singleLayerDiscs(int& count)
+{
+    static const DiscEntry entries[] = {
+        {QT_TRANSLATE_NOOP("TsMuxerWindow", "BD 25 GB, 1 layer (12,219,392 sectors)"), 12219392, 1, false, "25 GB"},
+    };
+    count = static_cast<int>(sizeof(entries) / sizeof(entries[0]));
+    return entries;
+}
+
 // The break sector(s) for a disc: every layer boundary except the last, which has no data after it.
 static QList<qint64> discBreaks(qint64 freeSectors, int layers)
 {
@@ -716,10 +737,10 @@ TsMuxerWindow::TsMuxerWindow()
             }
         }
         discTypeCombo->setToolTip(
-            wrapTip(tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
-                       "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
-                       "defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 "
-                       "(100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "
+            wrapTip(tr("Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what "
+                       "ImgBurn shows for your own disc. A disc formatted with defect management reports less, and "
+                       "how much less depends on how it was formatted: one blank 25 GB disc offered three different "
+                       "spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "
                        "\"Enter Free Sectors manually\" and type what ImgBurn shows: the layer break is worked out "
                        "from that number, so a wrong one puts the guard in the wrong place.")));
         auto* freeSectorsEdit = new QLineEdit(bdmvTab);
@@ -1199,10 +1220,10 @@ TsMuxerWindow::TsMuxerWindow()
                 const DiscEntry* discs = discTable(discCount);
                 for (int i = 0; i < discCount; ++i) discTypeCombo->setItemText(i, tr(discs[i].label));
                 discTypeCombo->setToolTip(wrapTip(
-                    tr("Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one "
-                       "ImgBurn shows for your own disc, because the same disc size exists at two capacities: a "
-                       "defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 "
-                       "(100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "
+                    tr("Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what "
+                       "ImgBurn shows for your own disc. A disc formatted with defect management reports less, and "
+                       "how much less depends on how it was formatted: one blank 25 GB disc offered three different "
+                       "spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "
                        "\"Enter Free Sectors manually\" and type what ImgBurn shows: the layer break is worked out "
                        "from that number, so a wrong one puts the guard in the wrong place.")));
                 freeSectorsEdit->setPlaceholderText(tr("ImgBurn -> Free Sectors (e.g. 48,878,592)"));
@@ -1423,14 +1444,24 @@ TsMuxerWindow::TsMuxerWindow()
         discSizeCombo->addItem(tr("Off"), 0);
         discSizeCombo->setItemData(0, 0, Qt::UserRole + 1);
         {
+            // Single layer sizes first, then the multi-layer table, which keeps the list in
+            // ascending capacity order and keeps BD25, which this list has always offered.
+            int slCount = 0;
+            const DiscEntry* sl = singleLayerDiscs(slCount);
             int discCount = 0;
             const DiscEntry* discs = discTable(discCount);
-            for (int i = 0; i < discCount; ++i)
+            int row = 1;
+            for (int pass = 0; pass < 2; ++pass)
             {
-                discSizeCombo->addItem(tr(discs[i].label), discs[i].layers);
-                discSizeCombo->setItemData(i + 1, discs[i].freeSectors, Qt::UserRole + 1);
-                discSizeCombo->setItemData(i + 1, discs[i].isXL ? 1 : 0, Qt::UserRole + 2);
-                discSizeCombo->setItemData(i + 1, QString::fromLatin1(discs[i].band), Qt::UserRole + 3);
+                const DiscEntry* set = pass == 0 ? sl : discs;
+                const int n = pass == 0 ? slCount : discCount;
+                for (int i = 0; i < n; ++i, ++row)
+                {
+                    discSizeCombo->addItem(tr(set[i].label), set[i].layers);
+                    discSizeCombo->setItemData(row, set[i].freeSectors, Qt::UserRole + 1);
+                    discSizeCombo->setItemData(row, set[i].isXL ? 1 : 0, Qt::UserRole + 2);
+                    discSizeCombo->setItemData(row, QString::fromLatin1(set[i].band), Qt::UserRole + 3);
+                }
             }
         }
         auto* guardCheck = new QCheckBox(tr("Layer-break guard"), dlBox);
@@ -1453,6 +1484,20 @@ TsMuxerWindow::TsMuxerWindow()
         beforeSpin->setSuffix(tr(" MB"));
         beforeSpin->setEnabled(false);
         beforeCheck->setEnabled(false);
+        // The capacity of a real disc, and the field that lets a user correct it. The same disc size
+        // exists at two capacities, and the layer break is computed from whatever is here, so a
+        // figure that does not match the disc in the drive puts the guard in the wrong place. The
+        // value is pre-filled from the disc above and locked, exactly as in the BDMV -> ISO tab, so
+        // it cannot be changed by accident; the checkbox unlocks it for a disc that reports
+        // something else.
+        auto* dlFreeSectorsLabel = new QLabel(tr("Free Sectors (ImgBurn):"), dlBox);
+        auto* dlFreeSectorsEdit = new QLineEdit(dlBox);
+        dlFreeSectorsEdit->setObjectName("dlFreeSectors");
+        dlFreeSectorsEdit->setReadOnly(true);
+        dlFreeSectorsEdit->setValidator(
+            new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[0-9 .,]*")), dlFreeSectorsEdit));
+        auto* dlManualCheck = new QCheckBox(tr("Enter Free Sectors manually (advanced)"), dlBox);
+        dlManualCheck->setObjectName("dlFreeSectorsManual");
         auto* oversizeCheck = new QCheckBox(tr("Allow oversize"), dlBox);
         oversizeCheck->setObjectName("dlAllowOversize");
         auto* fitLabel = new QLabel(tr("Fit to disc:"), dlBox);
@@ -1484,21 +1529,46 @@ TsMuxerWindow::TsMuxerWindow()
         auto* breaksLabel = new QLabel(dlBox);
         breaksLabel->setWordWrap(true);
         breaksLabel->setStyleSheet("color:#7f8c8d;");
+        dlFreeSectorsLabel->setToolTip(fitTip);
+        dlFreeSectorsEdit->setToolTip(
+            wrapTip(tr("The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer "
+                       "break is worked out from this number, so if your disc reports something else, tick the box "
+                       "below and enter that value.")));
+        dlManualCheck->setToolTip(
+            wrapTip(tr("The Free Sectors above are pre-filled for the selected disc and locked to prevent accidental "
+                       "changes. Tick this only if ImgBurn shows a different Free Sectors for your exact disc, then "
+                       "type that number. Un-tick to restore the standard value.")));
         int rr = 0;
         dl->addWidget(fitLabel, rr, 0);
         dl->addWidget(discSizeCombo, rr++, 1);
+        dl->addWidget(dlFreeSectorsLabel, rr, 0);
+        dl->addWidget(dlFreeSectorsEdit, rr++, 1);
+        dl->addWidget(dlManualCheck, rr++, 0, 1, 2);
         dl->addWidget(guardCheck, rr, 0);
         dl->addWidget(guardSpin, rr++, 1);
         dl->addWidget(beforeCheck, rr, 0);
         dl->addWidget(beforeSpin, rr++, 1);
         dl->addWidget(oversizeCheck, rr++, 0, 1, 2);
         dl->addWidget(breaksLabel, rr++, 0, 1, 2);
+
+        // Whatever is in the field wins, so a corrected capacity reaches the break calculation and
+        // the muxer rather than only being displayed.
+        auto dlReadFreeSectors = [dlFreeSectorsEdit]() -> qint64
+        {
+            QString digits = dlFreeSectorsEdit->text();
+            digits.remove(QRegularExpression(QStringLiteral("[^0-9]")));
+            return digits.toLongLong();
+        };
+        auto dlFillFreeSectors = [discSizeCombo, dlFreeSectorsEdit]()
+        {
+            const qint64 fs = discSizeCombo->currentData(Qt::UserRole + 1).toLongLong();
+            dlFreeSectorsEdit->setText(fs > 0 ? QLocale().toString(fs) : QString());
+        };
         // Show where the guard will actually land, so a wrong disc choice is visible before the mux
         // rather than after the burn.
-        auto updateDlBreaks = [discSizeCombo, breaksLabel]()
+        auto updateDlBreaks = [discSizeCombo, breaksLabel, dlReadFreeSectors]()
         {
-            const qint64 sectors = discSizeCombo->currentData(Qt::UserRole + 1).toLongLong();
-            const QList<qint64> breaks = discBreaks(sectors, discSizeCombo->currentData().toInt());
+            const QList<qint64> breaks = discBreaks(dlReadFreeSectors(), discSizeCombo->currentData().toInt());
             if (breaks.isEmpty())
             {
                 breaksLabel->clear();
@@ -1508,9 +1578,37 @@ TsMuxerWindow::TsMuxerWindow()
             for (const qint64 b : breaks) pretty << QLocale().toString(b);
             breaksLabel->setText(TsMuxerWindow::tr("Layer break(s) at sector: %1").arg(pretty.join("   |   ")));
         };
+        auto updateDlFreeSectorsRow = [discSizeCombo, dlFreeSectorsLabel, dlFreeSectorsEdit, dlManualCheck]()
+        {
+            // Nothing to correct when no disc is selected.
+            const bool on = discSizeCombo->currentIndex() > 0;
+            dlFreeSectorsLabel->setVisible(on);
+            dlFreeSectorsEdit->setVisible(on);
+            dlManualCheck->setVisible(on);
+        };
+        dlFillFreeSectors();
+        updateDlFreeSectorsRow();
         updateDlBreaks();
         connect(discSizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), dlBox,
-                [updateDlBreaks](int) { updateDlBreaks(); });
+                [dlFillFreeSectors, updateDlBreaks, updateDlFreeSectorsRow, dlManualCheck](int)
+                {
+                    // A new disc means a new standard capacity: re-fill and re-lock, so a value typed
+                    // for the previous disc cannot silently carry over to this one.
+                    dlManualCheck->setChecked(false);
+                    dlFillFreeSectors();
+                    updateDlFreeSectorsRow();
+                    updateDlBreaks();
+                });
+        connect(dlManualCheck, &QCheckBox::toggled, dlBox,
+                [dlFreeSectorsEdit, dlFillFreeSectors, updateDlBreaks](const bool on)
+                {
+                    dlFreeSectorsEdit->setReadOnly(!on);
+                    if (!on)
+                        dlFillFreeSectors();  // un-ticking restores the standard value
+                    updateDlBreaks();
+                });
+        connect(dlFreeSectorsEdit, &QLineEdit::textChanged, dlBox,
+                [updateDlBreaks](const QString&) { updateDlBreaks(); });
         // guardSpin follows guardCheck, but only where the guard actually does something (see
         // updateDlVisibility below).
         connect(guardCheck, &QCheckBox::toggled, guardSpin,
@@ -1552,18 +1650,32 @@ TsMuxerWindow::TsMuxerWindow()
         // Re-translate this groupbox on a runtime language change (see the BDMV->ISO tab hook above).
         m_retranslateHooks.push_back(
             [dlBox, fitLabel, guardCheck, guardSpin, oversizeCheck, discSizeCombo, beforeCheck, beforeSpin,
-             updateDlBreaks]()
+             updateDlBreaks, dlFreeSectorsLabel, dlFreeSectorsEdit, dlManualCheck]()
             {
                 dlBox->setTitle(tr("Dual-layer (BD-R/RE DL)"));
                 fitLabel->setText(tr("Fit to disc:"));
+                dlFreeSectorsLabel->setText(tr("Free Sectors (ImgBurn):"));
+                dlManualCheck->setText(tr("Enter Free Sectors manually (advanced)"));
+                dlFreeSectorsEdit->setToolTip(wrapTip(
+                    tr("The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The "
+                       "layer break is worked out from this number, so if your disc reports something else, tick "
+                       "the box below and enter that value.")));
+                dlManualCheck->setToolTip(wrapTip(
+                    tr("The Free Sectors above are pre-filled for the selected disc and locked to prevent "
+                       "accidental changes. Tick this only if ImgBurn shows a different Free Sectors for your exact "
+                       "disc, then type that number. Un-tick to restore the standard value.")));
                 guardCheck->setText(tr("Layer-break guard"));
                 beforeCheck->setText(tr("Also fill before the break"));
                 oversizeCheck->setText(tr("Allow oversize"));
                 discSizeCombo->setItemText(0, tr("Off"));
                 {
+                    int slCount = 0;
+                    const DiscEntry* sl = singleLayerDiscs(slCount);
                     int discCount = 0;
                     const DiscEntry* discs = discTable(discCount);
-                    for (int i = 0; i < discCount; ++i) discSizeCombo->setItemText(i + 1, tr(discs[i].label));
+                    int row = 1;
+                    for (int i = 0; i < slCount; ++i, ++row) discSizeCombo->setItemText(row, tr(sl[i].label));
+                    for (int i = 0; i < discCount; ++i, ++row) discSizeCombo->setItemText(row, tr(discs[i].label));
                 }
                 guardSpin->setSuffix(tr(" MB"));
                 beforeSpin->setSuffix(tr(" MB"));
@@ -2938,8 +3050,17 @@ QString TsMuxerWindow::getMuxOpts()
         auto* discSizeCombo = findChild<QComboBox*>("dlDiscSize");
         // The capacity goes out as an exact byte count taken from the disc's Free Sectors, not as a
         // bd50/bd100 keyword, so the 66 GB two-layer entry can be expressed at all.
-        const qint64 discSectors =
-            discSizeCombo ? discSizeCombo->currentData(Qt::UserRole + 1).toLongLong() : qint64(0);
+        //
+        // Taken from the FIELD, not from the combo entry, so a capacity the user corrected for the
+        // disc actually in the drive is what the mux and the layer break are based on.
+        qint64 discSectors = 0;
+        if (const auto* fsEdit = findChild<QLineEdit*>("dlFreeSectors");
+            fsEdit && discSizeCombo && discSizeCombo->currentIndex() > 0)
+        {
+            QString digits = fsEdit->text();
+            digits.remove(QRegularExpression(QStringLiteral("[^0-9]")));
+            discSectors = digits.toLongLong();
+        }
         if (discSectors > 0)
             rez += " --disc-size=" + QString::number(discSectors * 2048LL);
         auto* guardCheck = findChild<QCheckBox*>("dlGuardCheck");

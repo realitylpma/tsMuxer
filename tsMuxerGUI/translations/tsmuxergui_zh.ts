@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>选择光盘后会预填该容量的完整 Free Sectors 数值。请务必将其与 ImgBurn 为你自己的光盘显示的数值核对。带缺陷管理格式化的光盘会显示更少，具体少多少取决于格式化方式：一张 25 GB 空白光盘就提供了三种不同的备用区大小，因此无法在此列出单一的缩减数值。如果你的光盘不同，请勾选"手动输入 Free Sectors"并填入 ImgBurn 显示的数值：分层点由该数值计算得出，数值错误会把保护带放到错误的位置。</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB，单层（12,219,392 个扇区）</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>你要刻录的光盘的容量，即 ImgBurn 在 Free Sectors 中显示的数值。分层点由该数值计算得出，因此如果你的光盘显示的是其他数值，请勾选下方的复选框并填入该数值。</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>同时填充分层点之前的区域</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 将镜像控制在 66 GB 左右(前两层,可作为单独的光盘条目选择)可以提高在部分播放机上的成功率,但即使 66 GB 也不保证能播放。请在你自己的设备上测试。
 
 仍要生成 ISO 吗?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>选择光盘后，下方会预填其 Free Sectors。请务必将该数值与 ImgBurn 为你自己的光盘显示的数值核对，因为同一容量的光盘存在两种 Free Sectors: 带缺陷管理的光盘会每层保留 1 GiB 作为备用区域，转而显示 47,305,728 (100 GB)、60,403,712 (128 GB) 或 23,652,352 (BD-RE DL)。如果你的光盘不同，请勾选"手动输入 Free Sectors"并填入 ImgBurn 显示的数值: 分层点由该数值计算得出，数值错误会把保护带放到错误的位置。</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

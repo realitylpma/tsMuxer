@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>Choisir un disque pré-remplit le nombre COMPLET de Free Sectors pour cette taille. Vérifiez-le TOUJOURS avec ce qu'ImgBurn affiche pour votre propre disque. Un disque formaté avec gestion des défauts en indique moins, et le déficit dépend de la façon dont il a été formaté : un seul disque vierge de 25 GB a proposé ici trois tailles de zone de secours différentes, aucune valeur réduite unique ne peut donc figurer ici. Si le vôtre diffère, cochez "Saisir les Free Sectors manuellement" et tapez ce qu'affiche ImgBurn : le changement de couche est calculé à partir de ce nombre, une valeur erronée place donc la bande de garde au mauvais endroit.</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB, 1 couche (12,219,392 secteurs)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>La capacité du disque que vous gravez, telle qu'ImgBurn l'affiche sous Free Sectors. Le changement de couche est calculé à partir de ce nombre ; si votre disque en affiche un autre, cochez la case ci-dessous et saisissez cette valeur.</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>Remplir aussi avant le changement</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 Limiter l'image à environ 66 GB (les deux premières couches, sélectionnables comme entrée de disque distincte) augmente les chances sur certains lecteurs, mais même 66 GB ne garantit pas la lecture. Testez sur votre propre appareil.
 
 Créer l'ISO malgré tout ?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>Choisir un disque pré-remplit ses Free Sectors ci-dessous. Vérifiez TOUJOURS ce nombre par rapport à celui qu'ImgBurn affiche pour votre propre disque, car la même taille de disque existe avec deux capacités : un disque à gestion des défauts réserve 1 GiB par couche comme zone de secours et indique 47,305,728 (100 GB), 60,403,712 (128 GB) ou 23,652,352 (BD-RE DL) à la place. Si le vôtre diffère, cochez "Saisir les Free Sectors manuellement" et tapez ce qu'affiche ImgBurn : le changement de couche est calculé à partir de ce nombre, une valeur erronée place donc la bande de garde au mauvais endroit.</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

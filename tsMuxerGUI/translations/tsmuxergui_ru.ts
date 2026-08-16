@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>При выборе диска подставляется ПОЛНОЕ значение Free Sectors для этого размера. ВСЕГДА сверяйте его с тем, что ImgBurn показывает для вашего диска. Диск, отформатированный с управлением дефектами, показывает меньше, а насколько меньше, зависит от того, как его форматировали: один чистый диск на 25 GB предложил три разных размера запасной области, поэтому единого уменьшенного значения здесь быть не может. Если у вас другое, отметьте "Ввести Free Sectors вручную" и введите то, что показывает ImgBurn: точка разрыва слоя рассчитывается из этого числа, поэтому неверное поместит защиту не туда.</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB, 1 слой (12,219,392 секторов)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>Ёмкость диска, который вы записываете, в том виде, в каком ImgBurn показывает её в Free Sectors. Точка разрыва слоя рассчитывается из этого числа, поэтому, если ваш диск показывает другое значение, отметьте флажок ниже и введите его.</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>Также заполнять перед разрывом</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 Если удержать образ в пределах примерно 66 GB (первые два слоя, выбираются отдельным пунктом списка дисков), на некоторых проигрывателях шансы выше, но даже 66 GB не гарантируют воспроизведение. Проверьте на своём устройстве.
 
 Всё равно создать ISO?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>При выборе диска его значение Free Sectors заполняется ниже. ВСЕГДА сверяйте это число с тем, которое ImgBurn показывает для вашего диска, потому что один и тот же размер диска существует с двумя ёмкостями: диск с управлением дефектами удерживает 1 GiB на слой в качестве запасной области и показывает вместо этого 47,305,728 (100 GB), 60,403,712 (128 GB) или 23,652,352 (BD-RE DL). Если у вас другое значение, отметьте "Ввести Free Sectors вручную" и введите то, что показывает ImgBurn: точка разрыва слоя рассчитывается из этого числа, поэтому неверное значение поместит защиту не туда.</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

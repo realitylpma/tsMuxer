@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>ディスクを選択すると、その容量の完全な Free Sectors が入力されます。必ず、お使いのディスクについて ImgBurn が表示する値と照合してください。欠陥管理でフォーマットされたディスクはこれより小さい値を返し、どれだけ小さいかはフォーマット方法によります。ある 25 GB の未使用ディスクは予備領域のサイズを 3 通り提示したため、ここに単一の削減値を載せることはできません。異なる場合は「Free Sectors を手動で入力」にチェックを入れ、ImgBurn の値を入力してください。レイヤーブレイクはこの数値から計算されるため、誤った値はガードを誤った位置に置きます。</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB、1層 (12,219,392 セクタ)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>焼き込むディスクの容量で、ImgBurn が Free Sectors として表示する値です。レイヤーブレイクはこの数値から計算されるため、お使いのディスクが異なる値を表示する場合は、下のチェックボックスをオンにしてその値を入力してください。</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>ブレイク前も埋める</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 イメージを約66 GB（最初の2層分、専用のディスク項目として選択できます）に抑えると再生できる可能性が上がるプレーヤーもありますが、66 GBでも再生は保証されません。必ずお手持ちの機器でテストしてください。
 
 このままISOを作成しますか？</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>ディスクを選択すると、下にその Free Sectors が自動入力されます。同じ容量表記のディスクでも Free Sectors は2通りあるため、この数値は必ずお使いのディスクについて ImgBurn が表示する値と照合してください。欠陥管理ありのディスクは1層あたり 1 GiB を予備領域として確保し、代わりに 47,305,728 (100 GB)、60,403,712 (128 GB)、23,652,352 (BD-RE DL) と表示されます。異なる場合は「Free Sectors を手動で入力」にチェックを入れ、ImgBurn の値を入力してください。レイヤーブレイクはこの数値から計算されるため、誤った値はガードを誤った位置に置きます。</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

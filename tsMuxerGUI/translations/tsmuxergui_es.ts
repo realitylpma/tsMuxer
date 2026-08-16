@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>Al elegir un disco se rellena la cifra COMPLETA de Free Sectors de ese tamaño. Comprueba SIEMPRE ese valor con el que ImgBurn muestra para tu propio disco. Un disco formateado con gestión de defectos indica menos, y cuánto menos depende de cómo se formateó: un solo disco de 25 GB ofreció aquí tres tamaños distintos de área de repuesto, así que no se puede indicar aquí una única cifra reducida. Si el tuyo difiere, marca "Introducir Free Sectors manualmente" y escribe lo que muestre ImgBurn: el salto de capa se calcula a partir de ese número, así que uno incorrecto coloca la banda de guarda en el sitio equivocado.</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB, 1 capa (12,219,392 sectores)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>La capacidad del disco que vas a grabar, tal como ImgBurn la muestra en Free Sectors. El salto de capa se calcula a partir de este número, así que si tu disco muestra otro valor, marca la casilla de abajo e introdúcelo.</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>Rellenar también antes del salto</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 Mantener la imagen en torno a 66 GB (las dos primeras capas, seleccionables como entrada de disco propia) mejora las probabilidades en algunos reproductores, pero ni siquiera 66 GB garantizan la reproducción. Prueba en tu propio dispositivo.
 
 ¿Crear la ISO de todos modos?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>Al elegir un disco se rellenan abajo sus Free Sectors. Compara SIEMPRE ese número con el que ImgBurn muestra para tu propio disco, porque el mismo tamaño de disco existe con dos capacidades: un disco con gestión de defectos reserva 1 GiB por capa como área de repuesto e indica 47,305,728 (100 GB), 60,403,712 (128 GB) o 23,652,352 (BD-RE DL) en su lugar. Si el tuyo difiere, marca "Introducir Free Sectors manualmente" y escribe lo que muestre ImgBurn: el salto de capa se calcula a partir de ese número, así que uno incorrecto coloca la banda de guarda en el sitio equivocado.</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>

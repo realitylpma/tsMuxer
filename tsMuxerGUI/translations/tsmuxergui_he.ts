@@ -2507,6 +2507,18 @@
 <context>
     <name>TsMuxerWindow</name>
     <message>
+        <source>Picking a disc pre-fills the FULL Free Sectors for that size. ALWAYS check it against what ImgBurn shows for your own disc. A disc formatted with defect management reports less, and how much less depends on how it was formatted: one blank 25 GB disc offered three different spare area sizes, so no single reduced figure can be listed here. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
+        <translation>בחירת דיסק ממלאת מראש את מספר Free Sectors המלא עבור הגודל הזה. תמיד השווה אותו למה ש-ImgBurn מציג עבור הדיסק שלך. דיסק שעוצב עם ניהול פגמים מדווח על פחות, וכמה פחות תלוי באופן שבו עוצב: דיסק ריק אחד בנפח 25 GB הציע כאן שלושה גדלים שונים של שטח רזרבי, ולכן לא ניתן לציין כאן ערך מופחת יחיד. אם שלך שונה, סמן את "הזן Free Sectors ידנית" והקלד את מה ש-ImgBurn מציג: שבירת השכבה מחושבת מהמספר הזה, ולכן ערך שגוי ימקם את המגן במקום הלא נכון.</translation>
+    </message>
+    <message>
+        <source>BD 25 GB, 1 layer (12,219,392 sectors)</source>
+        <translation>BD 25 GB, שכבה אחת (12,219,392 סקטורים)</translation>
+    </message>
+    <message>
+        <source>The capacity of the disc you are burning, as ImgBurn reports it under Free Sectors. The layer break is worked out from this number, so if your disc reports something else, tick the box below and enter that value.</source>
+        <translation>הקיבולת של הדיסק שאתה צורב, כפי ש-ImgBurn מציג אותה תחת Free Sectors. שבירת השכבה מחושבת מהמספר הזה, ולכן אם הדיסק שלך מציג ערך אחר, סמן את התיבה שלמטה והזן את הערך הזה.</translation>
+    </message>
+    <message>
         <source>Also fill before the break</source>
         <translation>מילוי גם לפני השבירה</translation>
     </message>
@@ -2565,10 +2577,6 @@ Build the ISO anyway?</source>
 שמירת הדמות בסביבות 66 GB (שתי השכבות הראשונות, ניתנות לבחירה כרשומת דיסק נפרדת) משפרת את הסיכויים בחלק מהנגנים, אך גם 66 GB אינם מבטיחים ניגון. בדוק במכשיר שלך.
 
 לבנות את ה-ISO בכל זאת?</translation>
-    </message>
-    <message>
-        <source>Picking a disc pre-fills its Free Sectors below. ALWAYS check that number against the one ImgBurn shows for your own disc, because the same disc size exists at two capacities: a defect-managed disc holds back 1 GiB per layer as spare area and reports 47,305,728 (100 GB), 60,403,712 (128 GB) or 23,652,352 (BD-RE DL) instead. If yours differs, tick "Enter Free Sectors manually" and type what ImgBurn shows: the layer break is worked out from that number, so a wrong one puts the guard in the wrong place.</source>
-        <translation>בחירת דיסק ממלאת מראש את ערך Free Sectors שלו למטה. תמיד השווה את המספר הזה לזה ש-ImgBurn מציג עבור הדיסק שלך, משום שאותו גודל דיסק קיים בשתי קיבולות: דיסק עם ניהול פגמים שומר 1 GiB בכל שכבה כשטח רזרבי ומדווח במקום זאת על 47,305,728 (100 GB), 60,403,712 (128 GB) או 23,652,352 (BD-RE DL). אם הערך שלך שונה, סמן את "הזן Free Sectors ידנית" והקלד את מה ש-ImgBurn מציג: שבירת השכבה מחושבת מהמספר הזה, ולכן ערך שגוי ימקם את המגן במקום הלא נכון.</translation>
     </message>
     <message>
         <location filename="../tsmuxerwindow.ui" line="41"/>
