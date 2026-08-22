@@ -43,10 +43,11 @@ static constexpr char EXCEPTION_ERR_MSG[] =
     }
 DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<double>& customChaptersList,
                         int& firstMplsOffset, int& firstM2tsOffset, bool& insertBlankPL, int& blankNum,
-                        bool& stereoMode, std::string& isoDiskLabel)
+                        bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot)
 {
     autoChapterLen = 0;
     stereoMode = false;
+    importBdmvRoot.clear();
     TextFile file(metaFileName, File::ofRead);
     string str;
     file.readLine(str);
@@ -91,6 +92,10 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
                 else if (paramPair[0] == "--label")
                 {
                     isoDiskLabel = paramPair[1];
+                }
+                else if (paramPair[0] == "--import-bdmv" && paramPair.size() > 1)
+                {
+                    importBdmvRoot = unquoteStr(paramPair[1]);
                 }
             }
 
@@ -1149,6 +1154,127 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     return 0;
 }
 
+
+static string importIsoRelPath(const string& srcRoot, const string& full)
+{
+    string out;
+    for (char c : full.substr(srcRoot.size()))
+    {
+        if (c == '\\')
+            c = '/';
+        if (c == '/' && (out.empty() || out.back() == '/'))
+            continue;
+        out += c;
+    }
+    while (!out.empty() && out.front() == '/')
+        out.erase(out.begin());
+    return out;
+}
+
+static string importUpperPath(string s)
+{
+    for (char& c : s)
+    {
+        if (c == '\\')
+            c = '/';
+        c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+    }
+    return s;
+}
+
+static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper)
+{
+    if (!iso)
+        return false;
+
+    while (srcRoot.size() > 1 && (srcRoot.back() == '/' || srcRoot.back() == '\\'))
+    {
+#ifdef _WIN32
+        if (srcRoot.size() == 3 && srcRoot[1] == ':')
+            break;
+#endif
+        srcRoot.pop_back();
+    }
+
+    {
+        const size_t sep = srcRoot.find_last_of("/\\");
+        if (sep != string::npos)
+        {
+            string base = srcRoot.substr(sep + 1);
+            for (char& c : base)
+                c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+            if (base == "BDMV")
+                srcRoot = srcRoot.substr(0, sep);
+        }
+    }
+
+    vector<string> files;
+    if (!findFilesRecursive(srcRoot + getDirSeparator(), "*", &files) || files.empty())
+    {
+        LTRACE(LT_ERROR, 2, "--import-bdmv: no files found under " << srcRoot);
+        return false;
+    }
+
+    vector<uint8_t> buf(16 * 1024 * 1024);
+    int copied = 0;
+    int skipped = 0;
+
+    for (const auto& full : files)
+    {
+        const string rel = importIsoRelPath(srcRoot, full);
+        const string upper = importUpperPath(rel);
+        const size_t slash = upper.find('/');
+        const string top = upper.substr(0, slash);
+
+        if (top != "BDMV" && top != "CERTIFICATE" && top != "AACS")
+            continue;
+
+        if (upper.rfind("BDMV/STREAM/SSIF/", 0) == 0 || skipUpper.count(upper))
+        {
+            ++skipped;
+            continue;
+        }
+
+        File in;
+        if (!in.open(full.c_str(), File::ofRead))
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv: can't read " << full);
+            return false;
+        }
+
+        ISOFile* out = iso->createFile();
+        if (!out->open(rel.c_str(), File::ofWrite))
+        {
+            delete out;
+            in.close();
+            LTRACE(LT_ERROR, 2, "--import-bdmv: can't create " << rel);
+            return false;
+        }
+
+        int n = 0;
+        while ((n = in.read(buf.data(), static_cast<uint32_t>(buf.size()))) > 0)
+        {
+            if (out->write(buf.data(), static_cast<uint32_t>(n)) < 0)
+            {
+                out->close();
+                delete out;
+                in.close();
+                LTRACE(LT_ERROR, 2, "--import-bdmv: write failed for " << rel);
+                return false;
+            }
+        }
+
+        out->close();
+        delete out;
+        in.close();
+        ++copied;
+    }
+
+    LTRACE(LT_INFO, 2, "--import-bdmv: imported " << copied << " file(s), skipped " << skipped
+                                                   << " generated/SSIF file(s)");
+    return copied > 0;
+}
+
 int main(int argc, char** argv)
 {
 #ifdef _WIN32
@@ -1317,8 +1443,9 @@ int main(int argc, char** argv)
         vector<double> customChapterList;
         bool stereoMode = false;
         string isoDiskLabel;
+        string importBdmvRoot;
         DiskType dt = checkBluRayMux(argv[1], autoChapterLen, customChapterList, firstMplsOffset, firstM2tsOffset,
-                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel);
+                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot);
         std::string fileExt2 = unquoteStr(fileExt);
         bool mkvMode = fileExt2 == "MKV" || fileExt2 == "MKA";
         bool muxMode =
@@ -1408,9 +1535,47 @@ int main(int argc, char** argv)
             muxerManager.doMux(dstFile, dt != DiskType::NONE ? &blurayHelper : nullptr);
             if (dt != DiskType::NONE)
             {
-                blurayHelper.writeBluRayFiles(muxerManager, insertBlankPL, firstMplsOffset, blankNum, stereoMode);
                 auto mainMuxer = dynamic_cast<TSMuxer*>(muxerManager.getMainMuxer());
                 auto subMuxer = dynamic_cast<TSMuxer*>(muxerManager.getSubMuxer());
+
+                if (!importBdmvRoot.empty())
+                {
+                    IsoWriter* iso = blurayHelper.isoWriter();
+                    if (!iso)
+                        throw runtime_error("--import-bdmv requires direct .iso output");
+
+                    set<string> skip;
+                    auto addSkip = [&skip](const string& p) { skip.insert(importUpperPath(p)); };
+
+                    auto addClipSkips = [&addSkip](TSMuxer* muxer)
+                    {
+                        if (!muxer)
+                            return;
+                        for (size_t i = 0; i < muxer->splitFileCnt(); ++i)
+                        {
+                            const string media = muxer->getFileNameByIdx(i);
+                            addSkip(media);
+
+                            const string clip = extractFileName(media);
+                            addSkip("BDMV/CLIPINF/" + clip + ".clpi");
+                            addSkip("BDMV/BACKUP/CLIPINF/" + clip + ".clpi");
+                        }
+                    };
+
+                    addClipSkips(mainMuxer);
+                    addClipSkips(subMuxer);
+
+                    const string mpls = strPadLeft(int32ToStr(firstMplsOffset), 5, '0') + ".mpls";
+                    addSkip("BDMV/PLAYLIST/" + mpls);
+                    addSkip("BDMV/BACKUP/PLAYLIST/" + mpls);
+
+                    if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip))
+                        throw runtime_error("--import-bdmv failed");
+                }
+                else
+                {
+                    blurayHelper.writeBluRayFiles(muxerManager, insertBlankPL, firstMplsOffset, blankNum, stereoMode);
+                }
 
                 if (mainMuxer)
                     blurayHelper.createCLPIFile(mainMuxer, mainMuxer->getFirstFileNum(), true);
