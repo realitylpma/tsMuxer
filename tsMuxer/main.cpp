@@ -43,11 +43,13 @@ static constexpr char EXCEPTION_ERR_MSG[] =
     }
 DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<double>& customChaptersList,
                         int& firstMplsOffset, int& firstM2tsOffset, bool& insertBlankPL, int& blankNum,
-                        bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot)
+                        bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot,
+                        int& baseMplsOffset)
 {
     autoChapterLen = 0;
     stereoMode = false;
     importBdmvRoot.clear();
+    baseMplsOffset = -1;
     TextFile file(metaFileName, File::ofRead);
     string str;
     file.readLine(str);
@@ -96,6 +98,12 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
                 else if (paramPair[0] == "--import-bdmv" && paramPair.size() > 1)
                 {
                     importBdmvRoot = unquoteStr(paramPair[1]);
+                }
+                else if (paramPair[0] == "--base-mpls" && paramPair.size() > 1)
+                {
+                    baseMplsOffset = strToInt32(paramPair[1].c_str());
+                    if (baseMplsOffset < 0 || baseMplsOffset > 1999)
+                        THROW(ERR_COMMON, "Invalid base MPLS offset " << baseMplsOffset)
                 }
             }
 
@@ -1444,8 +1452,10 @@ int main(int argc, char** argv)
         bool stereoMode = false;
         string isoDiskLabel;
         string importBdmvRoot;
+        int baseMplsOffset = -1;
         DiskType dt = checkBluRayMux(argv[1], autoChapterLen, customChapterList, firstMplsOffset, firstM2tsOffset,
-                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot);
+                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot,
+                                     baseMplsOffset);
         std::string fileExt2 = unquoteStr(fileExt);
         bool mkvMode = fileExt2 == "MKV" || fileExt2 == "MKA";
         bool muxMode =
@@ -1569,6 +1579,13 @@ int main(int argc, char** argv)
                     addSkip("BDMV/PLAYLIST/" + mpls);
                     addSkip("BDMV/BACKUP/PLAYLIST/" + mpls);
 
+                    if (baseMplsOffset >= 0)
+                    {
+                        const string baseMpls = strPadLeft(int32ToStr(baseMplsOffset), 5, '0') + ".mpls";
+                        addSkip("BDMV/PLAYLIST/" + baseMpls);
+                        addSkip("BDMV/BACKUP/PLAYLIST/" + baseMpls);
+                    }
+
                     if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip))
                         throw runtime_error("--import-bdmv failed");
                 }
@@ -1605,6 +1622,14 @@ int main(int argc, char** argv)
 
                 blurayHelper.createMPLSFile(mainMuxer, subMuxer, autoChapterLen, customChapterList, dt, firstMplsOffset,
                                             muxerManager.isMvcBaseViewR());
+
+                                            if (!importBdmvRoot.empty() && baseMplsOffset >= 0 && mainMuxer)
+                                            {
+                                                LTRACE(LT_INFO, 2, "Creating shortened 2D feature playlist "
+                                                                       << strPadLeft(int32ToStr(baseMplsOffset), 5, '0'));
+                                                blurayHelper.createMPLSFile(mainMuxer, nullptr, autoChapterLen, customChapterList, dt,
+                                                                            baseMplsOffset, false);
+                                            }
 
                 if (insertBlankPL && mainMuxer && !subMuxer)
                 {
