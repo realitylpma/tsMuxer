@@ -44,11 +44,12 @@ static constexpr char EXCEPTION_ERR_MSG[] =
 DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<double>& customChaptersList,
                         int& firstMplsOffset, int& firstM2tsOffset, bool& insertBlankPL, int& blankNum,
                         bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot,
-                        int& baseMplsOffset)
+                        std::string& importBdmvSkipManifest, int& baseMplsOffset)
 {
     autoChapterLen = 0;
     stereoMode = false;
     importBdmvRoot.clear();
+    importBdmvSkipManifest.clear();
     baseMplsOffset = -1;
     TextFile file(metaFileName, File::ofRead);
     string str;
@@ -98,6 +99,10 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
                 else if (paramPair[0] == "--import-bdmv" && paramPair.size() > 1)
                 {
                     importBdmvRoot = unquoteStr(paramPair[1]);
+                }
+                else if (paramPair[0] == "--import-bdmv-skip" && paramPair.size() > 1)
+                {
+                    importBdmvSkipManifest = unquoteStr(paramPair[1]);
                 }
                 else if (paramPair[0] == "--base-mpls" && paramPair.size() > 1)
                 {
@@ -1190,6 +1195,86 @@ static string importUpperPath(string s)
     return s;
 }
 
+
+static bool loadImportBdmvSkipManifest(const string& manifestName, set<string>& skipUpper)
+{
+    if (manifestName.empty())
+        return true;
+
+    File in;
+    if (!in.open(manifestName.c_str(), File::ofRead))
+    {
+        LTRACE(LT_ERROR, 2, "--import-bdmv-skip: can't read manifest " << manifestName);
+        return false;
+    }
+
+    vector<uint8_t> buf(64 * 1024);
+    string data;
+    int n = 0;
+    while ((n = in.read(buf.data(), static_cast<uint32_t>(buf.size()))) > 0)
+        data.append(reinterpret_cast<const char*>(buf.data()), static_cast<size_t>(n));
+    in.close();
+
+    int added = 0;
+    int ignored = 0;
+    size_t pos = 0;
+
+    while (pos <= data.size())
+    {
+        size_t end = data.find('\n', pos);
+        if (end == string::npos)
+            end = data.size();
+
+        string line = trimStr(data.substr(pos, end - pos));
+
+        // Strip UTF-8 BOM on the first line if present.
+        if (pos == 0 && line.size() >= 3 &&
+            static_cast<unsigned char>(line[0]) == 0xEF &&
+            static_cast<unsigned char>(line[1]) == 0xBB &&
+            static_cast<unsigned char>(line[2]) == 0xBF)
+        {
+            line.erase(0, 3);
+            line = trimStr(line);
+        }
+
+        if (!line.empty() && line[0] != '#')
+        {
+            line = unquoteStr(line);
+
+            while (!line.empty() && (line.front() == '/' || line.front() == '\\'))
+                line.erase(line.begin());
+
+            string upper = importUpperPath(line);
+
+            const bool allowedRoot =
+                upper.rfind("BDMV/", 0) == 0 ||
+                upper.rfind("CERTIFICATE/", 0) == 0 ||
+                upper.rfind("AACS/", 0) == 0;
+
+            if (!allowedRoot || upper.find("..") != string::npos)
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-skip: invalid manifest entry: " << line);
+                return false;
+            }
+
+            const auto inserted = skipUpper.insert(upper);
+            if (inserted.second)
+                ++added;
+            else
+                ++ignored;
+        }
+
+        if (end == data.size())
+            break;
+        pos = end + 1;
+    }
+
+    LTRACE(LT_INFO, 2, "--import-bdmv-skip: added " << added
+                                                    << " explicit skip path(s), "
+                                                    << ignored << " duplicate(s)");
+    return true;
+}
+
 static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper)
 {
     if (!iso)
@@ -1452,9 +1537,10 @@ int main(int argc, char** argv)
         bool stereoMode = false;
         string isoDiskLabel;
         string importBdmvRoot;
+        string importBdmvSkipManifest;
         int baseMplsOffset = -1;
         DiskType dt = checkBluRayMux(argv[1], autoChapterLen, customChapterList, firstMplsOffset, firstM2tsOffset,
-                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot,
+                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot, importBdmvSkipManifest,
                                      baseMplsOffset);
         std::string fileExt2 = unquoteStr(fileExt);
         bool mkvMode = fileExt2 == "MKV" || fileExt2 == "MKA";
@@ -1584,6 +1670,12 @@ int main(int argc, char** argv)
                         const string baseMpls = strPadLeft(int32ToStr(baseMplsOffset), 5, '0') + ".mpls";
                         addSkip("BDMV/PLAYLIST/" + baseMpls);
                         addSkip("BDMV/BACKUP/PLAYLIST/" + baseMpls);
+                    }
+
+                    if (!importBdmvSkipManifest.empty())
+                    {
+                        if (!loadImportBdmvSkipManifest(importBdmvSkipManifest, skip))
+                            THROW(ERR_COMMON, "--import-bdmv-skip failed")
                     }
 
                     if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip))
