@@ -44,12 +44,14 @@ static constexpr char EXCEPTION_ERR_MSG[] =
 DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<double>& customChaptersList,
                         int& firstMplsOffset, int& firstM2tsOffset, bool& insertBlankPL, int& blankNum,
                         bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot,
-                        std::string& importBdmvSkipManifest, int& baseMplsOffset)
+                        std::string& importBdmvSkipManifest, std::string& importBdmvReplaceManifest,
+                        int& baseMplsOffset)
 {
     autoChapterLen = 0;
     stereoMode = false;
     importBdmvRoot.clear();
     importBdmvSkipManifest.clear();
+    importBdmvReplaceManifest.clear();
     baseMplsOffset = -1;
     TextFile file(metaFileName, File::ofRead);
     string str;
@@ -103,6 +105,10 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
                 else if (paramPair[0] == "--import-bdmv-skip" && paramPair.size() > 1)
                 {
                     importBdmvSkipManifest = unquoteStr(paramPair[1]);
+                }
+                else if (paramPair[0] == "--import-bdmv-replace" && paramPair.size() > 1)
+                {
+                    importBdmvReplaceManifest = unquoteStr(paramPair[1]);
                 }
                 else if (paramPair[0] == "--base-mpls" && paramPair.size() > 1)
                 {
@@ -1196,6 +1202,117 @@ static string importUpperPath(string s)
 }
 
 
+
+static bool loadImportBdmvReplaceManifest(
+    const string& manifestName,
+    const set<string>& skipUpper,
+    vector<pair<string, string>>& replacements)
+{
+    replacements.clear();
+    if (manifestName.empty())
+        return true;
+
+    File in;
+    if (!in.open(manifestName.c_str(), File::ofRead))
+    {
+        LTRACE(LT_ERROR, 2, "--import-bdmv-replace: can't read manifest " << manifestName);
+        return false;
+    }
+
+    vector<uint8_t> buf(64 * 1024);
+    string data;
+    int n = 0;
+    while ((n = in.read(buf.data(), static_cast<uint32_t>(buf.size()))) > 0)
+        data.append(reinterpret_cast<const char*>(buf.data()), static_cast<size_t>(n));
+    in.close();
+
+    int added = 0;
+    size_t pos = 0;
+
+    while (pos <= data.size())
+    {
+        size_t end = data.find('\n', pos);
+        if (end == string::npos)
+            end = data.size();
+
+        string line = trimStr(data.substr(pos, end - pos));
+
+        if (pos == 0 && line.size() >= 3 &&
+            static_cast<unsigned char>(line[0]) == 0xEF &&
+            static_cast<unsigned char>(line[1]) == 0xBB &&
+            static_cast<unsigned char>(line[2]) == 0xBF)
+        {
+            line.erase(0, 3);
+            line = trimStr(line);
+        }
+
+        if (!line.empty() && line[0] != '#')
+        {
+            const size_t eq = line.find('=');
+            if (eq == string::npos)
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-replace: expected TARGET=SOURCE: " << line);
+                return false;
+            }
+
+            string targetRel = unquoteStr(trimStr(line.substr(0, eq)));
+            string sourceFile = unquoteStr(trimStr(line.substr(eq + 1)));
+
+            while (!targetRel.empty() &&
+                   (targetRel.front() == '/' || targetRel.front() == '\\'))
+                targetRel.erase(targetRel.begin());
+
+            const string upper = importUpperPath(targetRel);
+
+            const bool allowedRoot =
+                upper.rfind("BDMV/", 0) == 0 ||
+                upper.rfind("CERTIFICATE/", 0) == 0 ||
+                upper.rfind("AACS/", 0) == 0;
+
+            if (!allowedRoot || upper.find("..") != string::npos || sourceFile.empty())
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-replace: invalid manifest entry: " << line);
+                return false;
+            }
+
+            if (skipUpper.count(upper))
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-replace: target is also skipped: " << targetRel);
+                return false;
+            }
+
+            for (const auto& repl : replacements)
+            {
+                if (repl.first == upper)
+                {
+                    LTRACE(LT_ERROR, 2, "--import-bdmv-replace: duplicate target: " << targetRel);
+                    return false;
+                }
+            }
+
+            File test;
+            if (!test.open(sourceFile.c_str(), File::ofRead))
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-replace: replacement source not readable: "
+                                        << sourceFile);
+                return false;
+            }
+            test.close();
+
+            replacements.push_back(make_pair(upper, sourceFile));
+            ++added;
+        }
+
+        if (end == data.size())
+            break;
+        pos = end + 1;
+    }
+
+    LTRACE(LT_INFO, 2, "--import-bdmv-replace: loaded " << added
+                                                        << " replacement mapping(s)");
+    return true;
+}
+
 static bool loadImportBdmvSkipManifest(const string& manifestName, set<string>& skipUpper)
 {
     if (manifestName.empty())
@@ -1275,7 +1392,7 @@ static bool loadImportBdmvSkipManifest(const string& manifestName, set<string>& 
     return true;
 }
 
-static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper)
+static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper, const vector<pair<string, string>>& replacements)
 {
     if (!iso)
         return false;
@@ -1311,6 +1428,8 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
     vector<uint8_t> buf(16 * 1024 * 1024);
     int copied = 0;
     int skipped = 0;
+    int replaced = 0;
+    vector<bool> replacementUsed(replacements.size(), false);
 
     for (const auto& full : files)
     {
@@ -1328,10 +1447,22 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
             continue;
         }
 
-        File in;
-        if (!in.open(full.c_str(), File::ofRead))
+        string importSource = full;
+        int replacementIndex = -1;
+        for (size_t r = 0; r < replacements.size(); ++r)
         {
-            LTRACE(LT_ERROR, 2, "--import-bdmv: can't read " << full);
+            if (replacements[r].first == upper)
+            {
+                importSource = replacements[r].second;
+                replacementIndex = static_cast<int>(r);
+                break;
+            }
+        }
+
+        File in;
+        if (!in.open(importSource.c_str(), File::ofRead))
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv: can't read " << importSource);
             return false;
         }
 
@@ -1361,10 +1492,25 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
         delete out;
         in.close();
         ++copied;
+        if (replacementIndex >= 0)
+        {
+            replacementUsed[static_cast<size_t>(replacementIndex)] = true;
+            ++replaced;
+        }
+    }
+
+    for (size_t r = 0; r < replacements.size(); ++r)
+    {
+        if (!replacementUsed[r])
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-replace: target not found in original tree: "
+                                    << replacements[r].first);
+            return false;
+        }
     }
 
     LTRACE(LT_INFO, 2, "--import-bdmv: imported " << copied << " file(s), skipped " << skipped
-                                                   << " generated/SSIF file(s)");
+                                                   << " generated/SSIF file(s), replaced " << replaced << " file(s)");
     return copied > 0;
 }
 
@@ -1538,9 +1684,10 @@ int main(int argc, char** argv)
         string isoDiskLabel;
         string importBdmvRoot;
         string importBdmvSkipManifest;
+        string importBdmvReplaceManifest;
         int baseMplsOffset = -1;
         DiskType dt = checkBluRayMux(argv[1], autoChapterLen, customChapterList, firstMplsOffset, firstM2tsOffset,
-                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot, importBdmvSkipManifest,
+                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot, importBdmvSkipManifest, importBdmvReplaceManifest,
                                      baseMplsOffset);
         std::string fileExt2 = unquoteStr(fileExt);
         bool mkvMode = fileExt2 == "MKV" || fileExt2 == "MKA";
@@ -1678,7 +1825,14 @@ int main(int argc, char** argv)
                             THROW(ERR_COMMON, "--import-bdmv-skip failed")
                     }
 
-                    if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip))
+                    vector<pair<string, string>> replacements;
+                    if (!importBdmvReplaceManifest.empty())
+                    {
+                        if (!loadImportBdmvReplaceManifest(importBdmvReplaceManifest, skip, replacements))
+                            THROW(ERR_COMMON, "--import-bdmv-replace failed")
+                    }
+
+                    if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip, replacements))
                         throw runtime_error("--import-bdmv failed");
                 }
                 else
