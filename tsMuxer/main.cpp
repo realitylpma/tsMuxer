@@ -44,7 +44,7 @@ static constexpr char EXCEPTION_ERR_MSG[] =
 DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<double>& customChaptersList,
                         int& firstMplsOffset, int& firstM2tsOffset, bool& insertBlankPL, int& blankNum,
                         bool& stereoMode, std::string& isoDiskLabel, std::string& importBdmvRoot,
-                        std::string& importBdmvSkipManifest, std::string& importBdmvReplaceManifest,
+                        std::string& importBdmvSkipManifest, std::string& importBdmvReplaceManifest, std::string& importBdmvSsifManifest,
                         int& baseMplsOffset)
 {
     autoChapterLen = 0;
@@ -52,6 +52,7 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
     importBdmvRoot.clear();
     importBdmvSkipManifest.clear();
     importBdmvReplaceManifest.clear();
+    importBdmvSsifManifest.clear();
     baseMplsOffset = -1;
     TextFile file(metaFileName, File::ofRead);
     string str;
@@ -109,6 +110,10 @@ DiskType checkBluRayMux(const char* metaFileName, int& autoChapterLen, vector<do
                 else if (paramPair[0] == "--import-bdmv-replace" && paramPair.size() > 1)
                 {
                     importBdmvReplaceManifest = unquoteStr(paramPair[1]);
+                }
+                else if (paramPair[0] == "--import-bdmv-ssif" && paramPair.size() > 1)
+                {
+                    importBdmvSsifManifest = unquoteStr(paramPair[1]);
                 }
                 else if (paramPair[0] == "--base-mpls" && paramPair.size() > 1)
                 {
@@ -1392,7 +1397,211 @@ static bool loadImportBdmvSkipManifest(const string& manifestName, set<string>& 
     return true;
 }
 
-static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper, const vector<pair<string, string>>& replacements)
+
+struct ImportBdmvSsifGroup
+{
+    string ssifRel;
+    string baseRel;
+    string depRel;
+    bool dependentFirst = true;
+    vector<int64_t> baseExtentBytes;
+    vector<int64_t> depExtentBytes;
+};
+
+static bool parseImportBdmvPositiveInt64(const string& value, int64_t& out)
+{
+    if (value.empty())
+        return false;
+    int64_t v = 0;
+    for (const char c : value)
+    {
+        if (c < '0' || c > '9')
+            return false;
+        const int digit = c - '0';
+        if (v > (0x7fffffffffffffffLL - digit) / 10)
+            return false;
+        v = v * 10 + digit;
+    }
+    if (v <= 0)
+        return false;
+    out = v;
+    return true;
+}
+
+static bool parseImportBdmvExtentList(const string& value, vector<int64_t>& out)
+{
+    out.clear();
+    size_t pos = 0;
+    while (pos <= value.size())
+    {
+        size_t end = value.find(',', pos);
+        if (end == string::npos)
+            end = value.size();
+        const string token = trimStr(value.substr(pos, end - pos));
+        int64_t bytes = 0;
+        if (!parseImportBdmvPositiveInt64(token, bytes) || bytes % SECTOR_SIZE != 0 || bytes >= MAX_EXTENT_SIZE)
+            return false;
+        out.push_back(bytes);
+        if (end == value.size())
+            break;
+        pos = end + 1;
+    }
+    return !out.empty();
+}
+
+static bool loadImportBdmvSsifManifest(
+    const string& manifestName,
+    const set<string>& skipUpper,
+    vector<ImportBdmvSsifGroup>& groups)
+{
+    groups.clear();
+    if (manifestName.empty())
+        return true;
+
+    File in;
+    if (!in.open(manifestName.c_str(), File::ofRead))
+    {
+        LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: can't read manifest " << manifestName);
+        return false;
+    }
+
+    vector<uint8_t> buf(64 * 1024);
+    string data;
+    int n = 0;
+    while ((n = in.read(buf.data(), static_cast<uint32_t>(buf.size()))) > 0)
+        data.append(reinterpret_cast<const char*>(buf.data()), static_cast<size_t>(n));
+    in.close();
+
+    size_t pos = 0;
+    while (pos <= data.size())
+    {
+        size_t end = data.find('\n', pos);
+        if (end == string::npos)
+            end = data.size();
+        string line = trimStr(data.substr(pos, end - pos));
+
+        if (pos == 0 && line.size() >= 3 &&
+            static_cast<unsigned char>(line[0]) == 0xEF &&
+            static_cast<unsigned char>(line[1]) == 0xBB &&
+            static_cast<unsigned char>(line[2]) == 0xBF)
+        {
+            line.erase(0, 3);
+            line = trimStr(line);
+        }
+
+        if (!line.empty() && line[0] != '#')
+        {
+            vector<string> fields;
+            size_t fpos = 0;
+            while (fpos <= line.size())
+            {
+                size_t fend = line.find('|', fpos);
+                if (fend == string::npos)
+                    fend = line.size();
+                fields.push_back(trimStr(line.substr(fpos, fend - fpos)));
+                if (fend == line.size())
+                    break;
+                fpos = fend + 1;
+            }
+            if (fields.size() != 6)
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: expected 6 pipe-separated fields: " << line);
+                return false;
+            }
+
+            ImportBdmvSsifGroup g;
+            g.ssifRel = fields[0];
+            g.baseRel = fields[1];
+            g.depRel = fields[2];
+            while (!g.ssifRel.empty() && (g.ssifRel.front() == '/' || g.ssifRel.front() == '\\')) g.ssifRel.erase(g.ssifRel.begin());
+            while (!g.baseRel.empty() && (g.baseRel.front() == '/' || g.baseRel.front() == '\\')) g.baseRel.erase(g.baseRel.begin());
+            while (!g.depRel.empty() && (g.depRel.front() == '/' || g.depRel.front() == '\\')) g.depRel.erase(g.depRel.begin());
+
+            const string ssifUpper = importUpperPath(g.ssifRel);
+            const string baseUpper = importUpperPath(g.baseRel);
+            const string depUpper = importUpperPath(g.depRel);
+
+            if (ssifUpper.rfind("BDMV/STREAM/SSIF/", 0) != 0 ||
+                baseUpper.rfind("BDMV/STREAM/", 0) != 0 ||
+                depUpper.rfind("BDMV/STREAM/", 0) != 0 ||
+                baseUpper.rfind("BDMV/STREAM/SSIF/", 0) == 0 ||
+                depUpper.rfind("BDMV/STREAM/SSIF/", 0) == 0 ||
+                ssifUpper.find("..") != string::npos ||
+                baseUpper.find("..") != string::npos ||
+                depUpper.find("..") != string::npos ||
+                ssifUpper == baseUpper || ssifUpper == depUpper || baseUpper == depUpper)
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: invalid target paths: " << line);
+                return false;
+            }
+
+            if (fields[3] == "dependent-first")
+                g.dependentFirst = true;
+            else if (fields[3] == "base-first")
+                g.dependentFirst = false;
+            else
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: invalid extent order: " << fields[3]);
+                return false;
+            }
+
+            if (!parseImportBdmvExtentList(fields[4], g.baseExtentBytes) ||
+                !parseImportBdmvExtentList(fields[5], g.depExtentBytes) ||
+                g.baseExtentBytes.size() != g.depExtentBytes.size())
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: invalid/mismatched extent lists: " << line);
+                return false;
+            }
+
+            if (skipUpper.count(ssifUpper) || skipUpper.count(baseUpper) || skipUpper.count(depUpper))
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: preserved group target is also explicitly skipped: " << line);
+                return false;
+            }
+
+            for (const auto& old : groups)
+            {
+                const string oldSsif = importUpperPath(old.ssifRel);
+                const string oldBase = importUpperPath(old.baseRel);
+                const string oldDep = importUpperPath(old.depRel);
+                if (ssifUpper == oldSsif || ssifUpper == oldBase || ssifUpper == oldDep ||
+                    baseUpper == oldSsif || baseUpper == oldBase || baseUpper == oldDep ||
+                    depUpper == oldSsif || depUpper == oldBase || depUpper == oldDep)
+                {
+                    LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: duplicate/overlapping target in manifest: " << line);
+                    return false;
+                }
+            }
+
+            groups.push_back(g);
+        }
+
+        if (end == data.size())
+            break;
+        pos = end + 1;
+    }
+
+    LTRACE(LT_INFO, 2, "--import-bdmv-ssif: loaded " << groups.size() << " preserved SSIF group(s)");
+    return true;
+}
+
+static bool copyImportBdmvExactBytes(File& in, ISOFile* out, vector<uint8_t>& buf, int64_t bytes)
+{
+    int64_t remaining = bytes;
+    while (remaining > 0)
+    {
+        const uint32_t want = static_cast<uint32_t>(std::min<int64_t>(remaining, static_cast<int64_t>(buf.size())));
+        const int got = in.read(buf.data(), want);
+        if (got <= 0 || got != static_cast<int>(want))
+            return false;
+        if (out->write(buf.data(), want) < 0)
+            return false;
+        remaining -= want;
+    }
+    return true;
+}
+
+static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<string>& skipUpper, const vector<pair<string, string>>& replacements, const vector<ImportBdmvSsifGroup>& ssifGroups)
 {
     if (!iso)
         return false;
@@ -1430,6 +1639,14 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
     int skipped = 0;
     int replaced = 0;
     vector<bool> replacementUsed(replacements.size(), false);
+    set<string> preservedSsifOwnedUpper;
+    for (const auto& g : ssifGroups)
+    {
+        preservedSsifOwnedUpper.insert(importUpperPath(g.ssifRel));
+        preservedSsifOwnedUpper.insert(importUpperPath(g.baseRel));
+        preservedSsifOwnedUpper.insert(importUpperPath(g.depRel));
+    }
+    int preservedSsif = 0;
 
     for (const auto& full : files)
     {
@@ -1441,7 +1658,7 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
         if (top != "BDMV" && top != "CERTIFICATE" && top != "AACS")
             continue;
 
-        if (upper.rfind("BDMV/STREAM/SSIF/", 0) == 0 || skipUpper.count(upper))
+        if (upper.rfind("BDMV/STREAM/SSIF/", 0) == 0 || skipUpper.count(upper) || preservedSsifOwnedUpper.count(upper))
         {
             ++skipped;
             continue;
@@ -1499,6 +1716,112 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
         }
     }
 
+
+    for (const auto& g : ssifGroups)
+    {
+        const string ssifUpper = importUpperPath(g.ssifRel);
+        const string baseUpper = importUpperPath(g.baseRel);
+        const string depUpper = importUpperPath(g.depRel);
+
+        for (const auto& repl : replacements)
+        {
+            if (repl.first == ssifUpper || repl.first == baseUpper || repl.first == depUpper)
+            {
+                LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: target is also replaced: " << repl.first);
+                return false;
+            }
+        }
+
+        auto findSource = [&](const string& wantedUpper) -> string
+        {
+            for (const auto& full : files)
+            {
+                const string rel = importIsoRelPath(srcRoot, full);
+                if (importUpperPath(rel) == wantedUpper)
+                    return full;
+            }
+            return string();
+        };
+
+        const string sourceSsif = findSource(ssifUpper);
+        const string sourceBase = findSource(baseUpper);
+        const string sourceDep = findSource(depUpper);
+        if (sourceSsif.empty() || sourceBase.empty() || sourceDep.empty())
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: source member missing for " << g.ssifRel);
+            return false;
+        }
+
+        File baseIn;
+        File depIn;
+        if (!baseIn.open(sourceBase.c_str(), File::ofRead) || !depIn.open(sourceDep.c_str(), File::ofRead))
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: can't open component source(s) for " << g.ssifRel);
+            baseIn.close();
+            depIn.close();
+            return false;
+        }
+
+        ISOFile* baseOut = iso->createFile();
+        ISOFile* depOut = iso->createFile();
+        if (!baseOut->open(g.baseRel.c_str(), File::ofWrite) || !depOut->open(g.depRel.c_str(), File::ofWrite))
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: can't create component target(s) for " << g.ssifRel);
+            baseIn.close();
+            depIn.close();
+            delete baseOut;
+            delete depOut;
+            return false;
+        }
+
+        bool ok = true;
+        for (size_t e = 0; e < g.baseExtentBytes.size() && ok; ++e)
+        {
+            if (g.dependentFirst)
+            {
+                ok = copyImportBdmvExactBytes(depIn, depOut, buf, g.depExtentBytes[e]) &&
+                     copyImportBdmvExactBytes(baseIn, baseOut, buf, g.baseExtentBytes[e]);
+            }
+            else
+            {
+                ok = copyImportBdmvExactBytes(baseIn, baseOut, buf, g.baseExtentBytes[e]) &&
+                     copyImportBdmvExactBytes(depIn, depOut, buf, g.depExtentBytes[e]);
+            }
+        }
+
+        uint8_t extra = 0;
+        if (ok && (baseIn.read(&extra, 1) > 0 || depIn.read(&extra, 1) > 0))
+            ok = false;
+
+        baseOut->close();
+        depOut->close();
+        delete baseOut;
+        delete depOut;
+        baseIn.close();
+        depIn.close();
+
+        if (!ok)
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: extent plan does not exactly consume component streams for "
+                                    << g.ssifRel);
+            return false;
+        }
+
+        const bool aliasOk = g.dependentFirst
+            ? iso->createInterleavedFile(g.baseRel, g.depRel, g.ssifRel)
+            : iso->createInterleavedFile(g.depRel, g.baseRel, g.ssifRel);
+        if (!aliasOk)
+        {
+            LTRACE(LT_ERROR, 2, "--import-bdmv-ssif: could not create SSIF alias " << g.ssifRel);
+            return false;
+        }
+
+        copied += 2;
+        ++preservedSsif;
+        LTRACE(LT_INFO, 2, "--import-bdmv-ssif: preserved " << g.ssifRel
+                             << " from " << g.baseExtentBytes.size() << " extent pair(s)");
+    }
+
     for (size_t r = 0; r < replacements.size(); ++r)
     {
         if (!replacementUsed[r])
@@ -1510,7 +1833,7 @@ static bool importOriginalBdmvAssets(string srcRoot, IsoWriter* iso, const set<s
     }
 
     LTRACE(LT_INFO, 2, "--import-bdmv: imported " << copied << " file(s), skipped " << skipped
-                                                   << " generated/SSIF file(s), replaced " << replaced << " file(s)");
+                                                   << " generated/SSIF file(s), replaced " << replaced << " file(s), preserved " << preservedSsif << " SSIF group(s)");
     return copied > 0;
 }
 
@@ -1685,9 +2008,10 @@ int main(int argc, char** argv)
         string importBdmvRoot;
         string importBdmvSkipManifest;
         string importBdmvReplaceManifest;
+        string importBdmvSsifManifest;
         int baseMplsOffset = -1;
         DiskType dt = checkBluRayMux(argv[1], autoChapterLen, customChapterList, firstMplsOffset, firstM2tsOffset,
-                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot, importBdmvSkipManifest, importBdmvReplaceManifest,
+                                     insertBlankPL, blankNum, stereoMode, isoDiskLabel, importBdmvRoot, importBdmvSkipManifest, importBdmvReplaceManifest, importBdmvSsifManifest,
                                      baseMplsOffset);
         std::string fileExt2 = unquoteStr(fileExt);
         bool mkvMode = fileExt2 == "MKV" || fileExt2 == "MKA";
@@ -1832,7 +2156,14 @@ int main(int argc, char** argv)
                             THROW(ERR_COMMON, "--import-bdmv-replace failed")
                     }
 
-                    if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip, replacements))
+                    vector<ImportBdmvSsifGroup> preservedSsifGroups;
+                    if (!importBdmvSsifManifest.empty())
+                    {
+                        if (!loadImportBdmvSsifManifest(importBdmvSsifManifest, skip, preservedSsifGroups))
+                            THROW(ERR_COMMON, "--import-bdmv-ssif failed")
+                    }
+
+                    if (!importOriginalBdmvAssets(importBdmvRoot, iso, skip, replacements, preservedSsifGroups))
                         throw runtime_error("--import-bdmv failed");
                 }
                 else
