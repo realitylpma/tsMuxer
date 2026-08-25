@@ -681,6 +681,10 @@ All parameters in this group start with two dashes:
                         --no-layer-fit  Do not move a file that would cross the layer break to
                               start after it; split it instead.
                         --label=<string>  Volume label for the image.
+                        --ssif-manifest=<file>  Recreate MVC SSIF aliases from a captured
+                              SSIF_EXTENTS manifest. Base/dependent M2TS bytes are copied
+                              unchanged but written into the exact alternating UDF extents
+                              captured from tsMuxeR's direct MVC ISO path.
 )help";
     LTRACE(LT_INFO, 2, help);
 }
@@ -756,6 +760,124 @@ static bool findM2tsPcrMedian(const string& fileName, const int64_t offset, cons
     return true;
 }
 
+struct SsifBridgePair
+{
+    string ssifRel;
+    string baseRel;
+    string depRel;
+    bool dependentFirst = true;
+    vector<int64_t> baseChunks;
+    vector<int64_t> depChunks;
+};
+
+static string ssifNormalizeRel(string s)
+{
+    for (auto& c : s)
+        if (c == '\\')
+            c = '/';
+    while (!s.empty() && s.front() == '/')
+        s.erase(s.begin());
+    return s;
+}
+
+static bool ssifParseSizes(const string& s, vector<int64_t>& out)
+{
+    out.clear();
+    for (const auto& token : splitStr(s.c_str(), ','))
+    {
+        if (token.empty())
+            return false;
+        try
+        {
+            const int64_t n = std::stoll(token);
+            if (n <= 0)
+                return false;
+            out.push_back(n);
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+    return !out.empty();
+}
+
+static bool ssifLoadManifest(const string& fileName, vector<SsifBridgePair>& pairs, string& error)
+{
+    std::ifstream f(fileName, std::ios::binary);
+    if (!f)
+    {
+        error = "can't open SSIF manifest " + fileName;
+        return false;
+    }
+
+    pairs.clear();
+    string line;
+    int lineNum = 0;
+    while (std::getline(f, line))
+    {
+        ++lineNum;
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        line = trimStr(line);
+        if (line.empty() || line[0] == '#')
+            continue;
+        if (line == "PHASE2_SSIF_MANIFEST_V1")
+            continue;
+
+        const vector<string> p = splitStr(line.c_str(), '|');
+        if (p.size() != 7 || p[0] != "SSIF_EXTENTS")
+        {
+            error = "bad SSIF manifest line " + std::to_string(lineNum);
+            return false;
+        }
+
+        SsifBridgePair pair;
+        pair.ssifRel = ssifNormalizeRel(trimStr(p[1]));
+        pair.baseRel = ssifNormalizeRel(trimStr(p[2]));
+        pair.depRel = ssifNormalizeRel(trimStr(p[3]));
+        const string order = strToUpperCase(trimStr(p[4]));
+        pair.dependentFirst = order == "DEPENDENT_FIRST";
+        if (!pair.dependentFirst)
+        {
+            error = "unsupported SSIF order on line " + std::to_string(lineNum) + ": " + p[4];
+            return false;
+        }
+
+        if (!ssifParseSizes(trimStr(p[5]), pair.baseChunks) ||
+            !ssifParseSizes(trimStr(p[6]), pair.depChunks) ||
+            pair.baseChunks.size() != pair.depChunks.size())
+        {
+            error = "invalid/mismatched SSIF extent lists on line " + std::to_string(lineNum);
+            return false;
+        }
+
+        pairs.push_back(std::move(pair));
+    }
+
+    if (pairs.empty())
+    {
+        error = "SSIF manifest contains no pairs";
+        return false;
+    }
+    return true;
+}
+
+static int64_t ssifChunkSum(const vector<int64_t>& v)
+{
+    int64_t sum = 0;
+    for (const int64_t n : v)
+        sum += n;
+    return sum;
+}
+
+static string ssifUpper(string s)
+{
+    for (auto& c : s)
+        c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+    return s;
+}
+
 static int bdmvFolderToGuardedIso(const int argc, char** argv)
 {
     int layerBreakGuardMB = -1;
@@ -767,6 +889,7 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     bool keepExtras = false;
     bool innerOnly = false;
     string discLabel;
+    string ssifManifestPath;
     vector<string> positional;
     for (int i = 2; i < argc; ++i)
     {
@@ -794,6 +917,8 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
                 innerOnly = true;
             else if (a.rfind("--label=", 0) == 0)
                 discLabel = a.substr(8);
+            else if (a.rfind("--ssif-manifest=", 0) == 0)
+                ssifManifestPath = a.substr(16);
             else
                 positional.push_back(a);
         }
@@ -808,7 +933,8 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
         LTRACE(LT_ERROR, 2,
                "Usage: tsMuxeR --bdmv-to-iso [--layer-break-guard=<MB>] [--layer-break-guard-before=<MB>] "
                "[--layer-break-lbn=<sector>] [--disc-capacity=<sectors>] [--original-order] [--no-layer-fit] "
-               "[--keep-extra-files] [--inner-only] [--label=<string>] <BDMV_folder> <out.iso>");
+               "[--keep-extra-files] [--inner-only] [--label=<string>] [--ssif-manifest=<file>] "
+               "<BDMV_folder> <out.iso>");
         return -1;
     }
     string srcRoot = positional[0];
@@ -947,6 +1073,108 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
             LTRACE(LT_INFO, 2, "  standard folders: generated BACKUP from " << backup.size() << " navigation file(s)");
     }
 
+    // Phase-2 SSIF bridge. Resolve manifest paths against the source inventory,
+    // validate every captured extent byte count, then remove the paired M2TS
+    // files from the ordinary contiguous-copy list. Their bytes stay in `total`;
+    // they will be written below in captured dependent/base alternation.
+    struct PreparedSsifPair
+    {
+        SsifBridgePair spec;
+        string baseFull;
+        string depFull;
+        int64_t baseSize = 0;
+        int64_t depSize = 0;
+    };
+    vector<PreparedSsifPair> preparedSsif;
+    if (!ssifManifestPath.empty())
+    {
+        if (layerBreakGuardMB >= 0 || layerBreakGuardBeforeMB >= 0 || !layerBreakLbns.empty() || innerOnly)
+        {
+            LTRACE(LT_ERROR, 2,
+                   "--ssif-manifest is currently for single-layer/no-guard ISO authoring only; "
+                   "do not combine it with layer-break/inner-only options");
+            return -1;
+        }
+
+        vector<SsifBridgePair> specs;
+        string manifestError;
+        if (!ssifLoadManifest(ssifManifestPath, specs, manifestError))
+        {
+            LTRACE(LT_ERROR, 2, manifestError);
+            return -1;
+        }
+
+        std::set<string> pairedPaths;
+        for (const auto& spec : specs)
+        {
+            const string baseKey = ssifUpper(spec.baseRel);
+            const string depKey = ssifUpper(spec.depRel);
+            const string ssifKey = ssifUpper(spec.ssifRel);
+
+            const Item* baseItem = nullptr;
+            const Item* depItem = nullptr;
+            for (const auto& it : items)
+            {
+                const string k = ssifUpper(ssifNormalizeRel(it.rel));
+                if (k == baseKey)
+                    baseItem = &it;
+                if (k == depKey)
+                    depItem = &it;
+                if (k == ssifKey)
+                {
+                    LTRACE(LT_ERROR, 2,
+                           "SSIF manifest target already exists as a physical source file: " << spec.ssifRel);
+                    return -1;
+                }
+            }
+
+            if (!baseItem || !depItem)
+            {
+                LTRACE(LT_ERROR, 2,
+                       "SSIF manifest pair not found in source: base=" << spec.baseRel << " dependent=" << spec.depRel);
+                return -1;
+            }
+
+            if (ssifChunkSum(spec.baseChunks) != baseItem->size ||
+                ssifChunkSum(spec.depChunks) != depItem->size)
+            {
+                LTRACE(LT_ERROR, 2,
+                       "SSIF manifest byte totals do not match source M2TS sizes for " << spec.ssifRel);
+                return -1;
+            }
+
+            for (size_t i = 0; i < spec.baseChunks.size(); ++i)
+            {
+                if (spec.baseChunks[i] % 2048 != 0 || spec.depChunks[i] % 2048 != 0)
+                {
+                    LTRACE(LT_ERROR, 2,
+                           "SSIF manifest extent is not 2048-byte sector aligned for " << spec.ssifRel);
+                    return -1;
+                }
+            }
+
+            if (!pairedPaths.insert(baseKey).second || !pairedPaths.insert(depKey).second)
+            {
+                LTRACE(LT_ERROR, 2, "An M2TS path appears in more than one SSIF manifest pair");
+                return -1;
+            }
+
+            preparedSsif.push_back({spec, baseItem->full, depItem->full, baseItem->size, depItem->size});
+        }
+
+        items.erase(
+            std::remove_if(items.begin(), items.end(),
+                           [&](const Item& it)
+                           {
+                               return pairedPaths.count(ssifUpper(ssifNormalizeRel(it.rel))) != 0;
+                           }),
+            items.end());
+
+        LTRACE(LT_INFO, 2,
+               "  SSIF bridge: " << preparedSsif.size()
+                                  << " MVC pair(s) will be written with captured UDF extents");
+    }
+
     // Default: largest .m2ts first, so the main movie straddles the layer break and gets the guard
     // band. --original-order keeps the files in their disc order instead; better for seamless
     // branching titles whose many segments should stay physically close to their playback order.
@@ -988,7 +1216,8 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     }
 
     // the metadata partition must hold ~1 File Entry per file + directory content; size it from the count
-    const int extraISOBlocks = static_cast<int>(items.size()) / 32 + 16;
+    const int ssifLogicalEntries = static_cast<int>(preparedSsif.size()) * 3;
+    const int extraISOBlocks = (static_cast<int>(items.size()) + ssifLogicalEntries) / 32 + 16;
 
     LTRACE(
         LT_INFO, 2,
@@ -1040,6 +1269,100 @@ static int bdmvFolderToGuardedIso(const int argc, char** argv)
     };
     vector<FileRange> ranges;
     ranges.reserve(items.size());
+
+    // Write every manifested MVC pair before ordinary files. Alternating
+    // ISOFile writers makes FileEntryInfo::writeImpl() start a new UDF extent
+    // whenever the stream changes. The schedule is captured from tsMuxeR's own
+    // direct MVC ISO path rather than guessed.
+    auto updateCopyProgress = [&](const int64_t n)
+    {
+        written += n;
+        if (total > 0)
+        {
+            const int tenths =
+                static_cast<int>(static_cast<double>(written) / static_cast<double>(total) * 1000.0);
+            if (tenths != lastTenths)
+            {
+                lastTenths = tenths;
+                cout << tenths / 10 << '.' << tenths % 10 << "% complete" << std::endl;
+            }
+        }
+    };
+
+    auto copyExact = [&](File& in, ISOFile* out, int64_t bytes, const string& label) -> bool
+    {
+        int64_t left = bytes;
+        while (left > 0)
+        {
+            const uint32_t want =
+                static_cast<uint32_t>(std::min<int64_t>(left, static_cast<int64_t>(buf.size())));
+            const int n = in.read(buf.data(), want);
+            if (n <= 0)
+            {
+                LTRACE(LT_ERROR, 2, "Unexpected EOF while writing SSIF extent from " << label);
+                return false;
+            }
+            if (out->write(buf.data(), static_cast<uint32_t>(n)) < 0)
+            {
+                LTRACE(LT_ERROR, 2, "Write error while writing SSIF extent from " << label);
+                return false;
+            }
+            left -= n;
+            updateCopyProgress(n);
+        }
+        return true;
+    };
+
+    for (const auto& pair : preparedSsif)
+    {
+        File baseIn;
+        File depIn;
+        if (!baseIn.open(pair.baseFull.c_str(), File::ofRead) || !depIn.open(pair.depFull.c_str(), File::ofRead))
+        {
+            LTRACE(LT_ERROR, 2, "Can't open an SSIF bridge source pair for " << pair.spec.ssifRel);
+            return -1;
+        }
+
+        ISOFile* baseOut = iso->createFile();
+        ISOFile* depOut = iso->createFile();
+        baseOut->open(pair.spec.baseRel.c_str(), File::ofWrite);
+        depOut->open(pair.spec.depRel.c_str(), File::ofWrite);
+
+        for (size_t i = 0; i < pair.spec.baseChunks.size(); ++i)
+        {
+            if (!copyExact(depIn, depOut, pair.spec.depChunks[i], pair.spec.depRel) ||
+                !copyExact(baseIn, baseOut, pair.spec.baseChunks[i], pair.spec.baseRel))
+            {
+                return -1;
+            }
+        }
+
+        uint8_t extraByte = 0;
+        if (baseIn.read(&extraByte, 1) != 0 || depIn.read(&extraByte, 1) != 0)
+        {
+            LTRACE(LT_ERROR, 2, "SSIF manifest did not consume the complete source pair " << pair.spec.ssifRel);
+            return -1;
+        }
+
+        baseOut->close();
+        depOut->close();
+        delete baseOut;
+        delete depOut;
+        baseIn.close();
+        depIn.close();
+
+        if (!iso->createInterleavedFile(pair.spec.baseRel, pair.spec.depRel, pair.spec.ssifRel))
+        {
+            LTRACE(LT_ERROR, 2, "Failed to create SSIF alias " << pair.spec.ssifRel);
+            return -1;
+        }
+
+        LTRACE(LT_INFO, 2,
+               "  SSIF bridge: created " << pair.spec.ssifRel << " from " << pair.spec.baseRel << " + "
+                                         << pair.spec.depRel << " (" << pair.spec.baseChunks.size()
+                                         << " extent pair(s), dependent first)");
+    }
+
     for (auto& item : items)
     {
         File in;

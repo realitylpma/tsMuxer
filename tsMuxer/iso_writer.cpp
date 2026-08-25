@@ -11,6 +11,7 @@
 #include "convertUTF.h"
 #include "utf8Converter.h"
 #include "vod_common.h"
+#include <iostream>
 
 // ----------- routines --------------
 
@@ -787,7 +788,6 @@ bool IsoWriter::createInterleavedFile(const std::string& inFile1, const std::str
     const FileEntryInfo* inEntry1 = getEntryByName(toIsoSeparator(inFile1), FileTypes::RealtimeFile);
     if (!inEntry1)
         return false;
-
     const FileEntryInfo* inEntry2 = getEntryByName(toIsoSeparator(inFile2), FileTypes::RealtimeFile);
     if (!inEntry2)
         return false;
@@ -796,18 +796,36 @@ bool IsoWriter::createInterleavedFile(const std::string& inFile1, const std::str
     if (!outEntry)
         return false;
 
-    assert(inEntry1->m_extents.size() == inEntry2->m_extents.size());
+    // Phase-2 SSIF bridge: expose the exact extent schedule produced by the
+    // normal direct-MVC ISO path. inFile1 is base/main. The existing tsMuxer
+    // SSIF layout is dependent first, then base, for every matched extent pair.
+    if (inEntry1->m_extents.size() != inEntry2->m_extents.size())
+        return false;
+
+    std::cout << "SSIF_EXTENTS|" << toIsoSeparator(outFile) << "|" << toIsoSeparator(inFile1) << "|"
+              << toIsoSeparator(inFile2) << "|DEPENDENT_FIRST|";
     for (size_t i = 0; i < inEntry1->m_extents.size(); ++i)
     {
-        assert(inEntry1->m_extents[i].size % SECTOR_SIZE == 0);
-        assert(inEntry2->m_extents[i].size % SECTOR_SIZE == 0);
+        if (i)
+            std::cout << ",";
+        std::cout << inEntry1->m_extents[i].size;
+    }
+    std::cout << "|";
+    for (size_t i = 0; i < inEntry2->m_extents.size(); ++i)
+    {
+        if (i)
+            std::cout << ",";
+        std::cout << inEntry2->m_extents[i].size;
+    }
+    std::cout << std::endl;
+
+    for (size_t i = 0; i < inEntry1->m_extents.size(); ++i)
+    {
+        if (inEntry1->m_extents[i].size % SECTOR_SIZE != 0 || inEntry2->m_extents[i].size % SECTOR_SIZE != 0)
+            return false;
         outEntry->addExtent(inEntry2->m_extents[i]);
         outEntry->addExtent(inEntry1->m_extents[i]);
-        // outEntry->m_extents.push_back(inEntry2->m_extents[i]);
-        // outEntry->m_extents.push_back(inEntry1->m_extents[i]);
     }
-    // outEntry->m_fileSize = inEntry1->m_fileSize + inEntry2->m_fileSize;
-
     return true;
 }
 
