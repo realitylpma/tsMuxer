@@ -2,7 +2,7 @@ name: Build for Windows 64-bit
 
 on:
   push:
-    branches: [master]
+    branches: [master, phase2-ssif-bridge-v4]
     tags: ["v*"]
 
 permissions:
